@@ -1,17 +1,28 @@
+#[cfg(test)]
+mod tests;
 mod tokens;
 mod transactions;
 
-use super::Result;
+use super::{Result, WeiToEth};
+use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
+use serde_with::{serde_as, DisplayFromStr, TimestampSecondsWithFrac};
 use tokens::{ERC20TokenTransfer, ERC721TokenTransfer};
 use transactions::{InternalTransaction, Transaction, TransactionOptions};
 
 const ACCOUNT: &str = "account";
 const ADDRESS: &str = "address";
-const TAG: &str = "tag";
-const PAGE: &str = "page";
+const CONTRACT_ADDRESS: &str = "contractaddress";
+const END_BLOCK: &str = "endblock";
+const ERC20_TOKEN_TRANSFERS: &str = "tokentx";
+const ERC721_TOKEN_TRANSFERS: &str = "tokennfttx";
+const INTERNAL_TRANSACTIONS: &str = "txlistinternal";
 const OFFSET: &str = "offset";
+const PAGE: &str = "page";
 const SORT: &str = "sort";
+const START_BLOCK: &str = "startblock";
+const TAG: &str = "tag";
+const TRANSACTIONS: &str = "txlist";
 
 pub struct Client {
     client: super::Client,
@@ -71,7 +82,7 @@ impl Client {
     /// * 'address' - An address.
     pub async fn transactions(&self, address: &str) -> Result<Vec<Transaction>> {
         self.client
-            .get::<Vec<Transaction>>(&[(MODULE, ACCOUNT), (ACTION, "txlist"), (ADDRESS, address)])
+            .get::<Vec<Transaction>>(&[(MODULE, ACCOUNT), (ACTION, TRANSACTIONS), (ADDRESS, address)])
             .await
     }
 
@@ -80,9 +91,10 @@ impl Client {
     /// # Arguments
     ///
     /// * 'address' - An address.
-    /// * 'options' - Additional transaction options.
+    /// * 'options' - Additional options.
     pub async fn transactions_with_options(&self, address: &str, options: TransactionOptions) -> Result<Vec<Transaction>> {
-        self.get_transactions_with_options::<Transaction>("txlist", address, options).await
+        self.get_transactions_with_options::<Transaction>(TRANSACTIONS, address, options)
+            .await
     }
 
     /// Returns the internal transactions for a given address (max 10,000).
@@ -91,7 +103,7 @@ impl Client {
     ///
     /// * 'address' - An address
     pub async fn internal_transactions(&self, address: &str) -> Result<Vec<InternalTransaction>> {
-        let parameters = &[(MODULE, ACCOUNT), (ACTION, "txlistinternal"), (ADDRESS, address)];
+        let parameters = &[(MODULE, ACCOUNT), (ACTION, INTERNAL_TRANSACTIONS), (ADDRESS, address)];
         self.client.get::<Vec<InternalTransaction>>(parameters).await
     }
 
@@ -101,7 +113,7 @@ impl Client {
     ///
     /// * 'hash' - A transaction hash.
     pub async fn internal_transactions_for_transaction(&self, hash: &str) -> Result<Vec<InternalTransaction>> {
-        let parameters = &[(MODULE, ACCOUNT), (ACTION, "txlistinternal"), ("txhash", hash)];
+        let parameters = &[(MODULE, ACCOUNT), (ACTION, INTERNAL_TRANSACTIONS), ("txhash", hash)];
         self.client.get::<Vec<InternalTransaction>>(parameters).await
     }
 
@@ -110,10 +122,129 @@ impl Client {
     /// # Arguments
     ///
     /// * 'address' - An address
-    /// * 'options' - Additional transaction options.
+    /// * 'options' - Additional options.
     pub async fn internal_transactions_with_options(&self, address: &str, options: TransactionOptions) -> Result<Vec<InternalTransaction>> {
-        self.get_transactions_with_options::<InternalTransaction>("txlistinternal", address, options)
+        self.get_transactions_with_options::<InternalTransaction>(INTERNAL_TRANSACTIONS, address, options)
             .await
+    }
+
+    /// Returns the ERC20 token transfers for a given address and contract address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    /// * 'contract_address' - A contract address
+    pub async fn erc20_token_transfers(&self, address: &str, contract_address: &str) -> Result<Vec<ERC20TokenTransfer>> {
+        let parameters = &[
+            (MODULE, ACCOUNT),
+            (ACTION, ERC20_TOKEN_TRANSFERS),
+            (ADDRESS, address),
+            (CONTRACT_ADDRESS, contract_address),
+        ];
+        self.client.get::<Vec<ERC20TokenTransfer>>(parameters).await
+    }
+
+    /// Returns the ERC20 token transfers for a given address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    pub async fn erc20_token_transfers_by_address(&self, address: &str) -> Result<Vec<ERC20TokenTransfer>> {
+        let parameters = &[(MODULE, ACCOUNT), (ACTION, ERC20_TOKEN_TRANSFERS), (ADDRESS, address)];
+        self.client.get::<Vec<ERC20TokenTransfer>>(parameters).await
+    }
+
+    /// Returns the ERC20 token transfers for a given contract address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'contract_address' - A contract address
+    pub async fn erc20_token_transfers_by_contract_address(&self, contract_address: &str) -> Result<Vec<ERC20TokenTransfer>> {
+        let parameters = &[
+            (MODULE, ACCOUNT),
+            (ACTION, ERC20_TOKEN_TRANSFERS),
+            (CONTRACT_ADDRESS, contract_address),
+        ];
+        self.client.get::<Vec<ERC20TokenTransfer>>(parameters).await
+    }
+
+    /// Returns the ERC20 token transfers based on the supplied options.
+    ///
+    /// # Arguments
+    ///
+    /// * 'options' - The token request options.
+    pub async fn erc20_token_transfers_with_options<'a>(&self, options: TokenOptions<'a>) -> Result<Vec<ERC20TokenTransfer>> {
+        self.get_tokens_with_options::<ERC20TokenTransfer>(ERC20_TOKEN_TRANSFERS, options)
+            .await
+    }
+
+    /// Returns the ERC721 token transfers for a given address and contract address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    /// * 'contract_address' - A contract address
+    pub async fn erc721_token_transfers(&self, address: &str, contract_address: &str) -> Result<Vec<ERC721TokenTransfer>> {
+        let parameters = &[
+            (MODULE, ACCOUNT),
+            (ACTION, ERC721_TOKEN_TRANSFERS),
+            (ADDRESS, address),
+            (CONTRACT_ADDRESS, contract_address),
+        ];
+        self.client.get::<Vec<ERC721TokenTransfer>>(parameters).await
+    }
+
+    /// Returns the ERC721 token transfers for a given address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    pub async fn erc721_token_transfers_by_address(&self, address: &str) -> Result<Vec<ERC721TokenTransfer>> {
+        let parameters = &[(MODULE, ACCOUNT), (ACTION, ERC721_TOKEN_TRANSFERS), (ADDRESS, address)];
+        self.client.get::<Vec<ERC721TokenTransfer>>(parameters).await
+    }
+
+    /// Returns the ERC721 token transfers for a given contract address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'contract_address' - A contract address
+    pub async fn erc721_token_transfers_by_contract_address(&self, contract_address: &str) -> Result<Vec<ERC721TokenTransfer>> {
+        let parameters = &[
+            (MODULE, ACCOUNT),
+            (ACTION, ERC721_TOKEN_TRANSFERS),
+            (CONTRACT_ADDRESS, contract_address),
+        ];
+        self.client.get::<Vec<ERC721TokenTransfer>>(parameters).await
+    }
+
+    /// Returns the ERC721 token transfers based on the supplied options.
+    ///
+    /// # Arguments
+    ///
+    /// * 'options' - The token request options.
+    pub async fn erc721_token_transfers_with_options<'a>(&self, options: TokenOptions<'a>) -> Result<Vec<ERC721TokenTransfer>> {
+        self.get_tokens_with_options::<ERC721TokenTransfer>(ERC721_TOKEN_TRANSFERS, options)
+            .await
+    }
+
+    /// Returns a list of blocks mined by an address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    pub async fn blocks_mined(&self, address: &str, block_type: BlockType, page: Page) -> Result<Vec<Block>> {
+        let block_type = block_type.to_string();
+        let page = page.to_string();
+        let parameters = &[
+            (MODULE, ACCOUNT),
+            (ACTION, "getminedblocks"),
+            (ADDRESS, address),
+            ("blocktype", &block_type),
+            (PAGE, &page.0),
+            (OFFSET, &page.1),
+        ];
+        self.client.get::<Vec<Block>>(parameters).await
     }
 
     async fn get_transactions_with_options<T: DeserializeOwned>(
@@ -128,24 +259,22 @@ impl Client {
         let parameter;
         if let Some(start_block) = options.start_block() {
             parameter = start_block.to_string();
-            parameters.push(("startblock", &parameter))
+            parameters.push((START_BLOCK, &parameter))
         }
 
         // Add end block if provided
         let parameter;
         if let Some(end_block) = options.end_block() {
             parameter = end_block.to_string();
-            parameters.push(("endblock", &parameter))
+            parameters.push((END_BLOCK, &parameter))
         }
 
         // Add page if provided
-        let number;
-        let offset;
+        let parameter;
         if let Some(page) = options.page() {
-            number = page.number.to_string();
-            parameters.push((PAGE, &number));
-            offset = page.offset.to_string();
-            parameters.push((OFFSET, &offset));
+            parameter = page.to_string();
+            parameters.push((PAGE, &parameter.0));
+            parameters.push((OFFSET, &parameter.1));
         }
 
         // Add sort order if provided
@@ -158,55 +287,90 @@ impl Client {
         self.client.get::<Vec<T>>(&parameters).await
     }
 
-    /// Returns the ERC20 token transfers for a given address (max 10,000).
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address
-    pub async fn erc20_token_transfers(&self, address: &str) -> Result<Vec<ERC20TokenTransfer>> {
-        let parameters = &[(MODULE, ACCOUNT), (ACTION, "tokentx"), (ADDRESS, address)];
-        self.client.get::<Vec<ERC20TokenTransfer>>(parameters).await
-    }
+    async fn get_tokens_with_options<'a, T: DeserializeOwned>(&self, action: &str, options: TokenOptions<'a>) -> Result<Vec<T>> {
+        let mut parameters = vec![(MODULE, ACCOUNT), (ACTION, action)];
 
-    /// Returns the ERC721 token transfers for a given address (max 10,000).
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address
-    pub async fn erc721_token_transfers(&self, address: &str) -> Result<Vec<ERC721TokenTransfer>> {
-        let parameters = &[(MODULE, ACCOUNT), (ACTION, "tokennfttx"), (ADDRESS, address)];
-        self.client.get::<Vec<ERC721TokenTransfer>>(parameters).await
-    }
+        // Add address if provided
+        if let Some(address) = options.address() {
+            parameters.push((ADDRESS, address))
+        }
 
-    /// Returns a list of blocks mined by an address.
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address
-    pub async fn blocks_mined(&self, address: &str) -> Result<Vec<Block>> {
-        let parameters = &[(MODULE, ACCOUNT), (ACTION, "getminedblocks"), (ADDRESS, address)];
-        self.client.get::<Vec<Block>>(parameters).await
+        // Add contract address if provided
+        if let Some(contract_address) = options.contract_address() {
+            parameters.push((ADDRESS, contract_address))
+        }
+
+        // Add page if provided
+        let parameter;
+        if let Some(page) = options.page() {
+            parameter = page.to_string();
+            parameters.push((PAGE, &parameter.0));
+            parameters.push((OFFSET, &parameter.1));
+        }
+
+        // Add start block if provided
+        let parameter;
+        if let Some(start_block) = options.start_block() {
+            parameter = start_block.to_string();
+            parameters.push((START_BLOCK, &parameter))
+        }
+
+        // Add end block if provided
+        let parameter;
+        if let Some(end_block) = options.end_block() {
+            parameter = end_block.to_string();
+            parameters.push((END_BLOCK, &parameter))
+        }
+
+        // Add sort order if provided
+        let parameter;
+        if let Some(sort) = options.sort() {
+            parameter = sort.to_string();
+            parameters.push((SORT, &parameter))
+        }
+
+        self.client.get::<Vec<T>>(&parameters).await
     }
 }
 
+use crate::accounts::tokens::TokenOptions;
 use crate::{APIError, ACTION, MODULE};
 use serde::Deserialize;
 
+#[serde_as]
 #[derive(Debug, Deserialize)]
 pub struct Balance {
     pub account: String,
-    #[serde(deserialize_with = "super::de_wei_to_eth")]
+    #[serde_as(as = "WeiToEth")]
     pub balance: f64,
 }
 
+#[serde_as]
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Block {
-    #[serde(alias = "blockNumber", deserialize_with = "super::de_u64_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub block_number: u64,
-    #[serde(alias = "timeStamp", deserialize_with = "super::de_u64_from_str")]
-    pub time_stamp: u64,
-    #[serde(alias = "blockReward", deserialize_with = "super::de_u128_from_str")]
+    #[serde_as(as = "TimestampSecondsWithFrac<String>")]
+    pub time_stamp: DateTime<Utc>,
+    #[serde_as(as = "DisplayFromStr")]
     pub block_reward: u128,
+}
+
+pub enum BlockType {
+    /// Canonical blocks
+    Blocks,
+    // Uncle blocks
+    Uncles,
+}
+
+impl BlockType {
+    fn to_string(&self) -> &'static str {
+        match self {
+            BlockType::Blocks => "blocks",
+            BlockType::Uncles => "uncles",
+        }
+    }
 }
 
 pub struct Page {
@@ -225,6 +389,16 @@ pub enum Tag {
     Latest,
 }
 
+impl Page {
+    fn new(number: u8, offset: u16) -> Page {
+        Page { number, offset }
+    }
+
+    fn to_string(&self) -> (String, String) {
+        (self.number.to_string(), self.offset.to_string())
+    }
+}
+
 impl Sort {
     fn to_string(&self) -> &'static str {
         match self {
@@ -241,201 +415,5 @@ impl Tag {
             Tag::Earliest => "earliest",
             Tag::Pending => "pending",
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Client;
-    use crate::accounts::{transactions::TransactionOptions, Sort};
-    use once_cell::sync::Lazy;
-    use tokio::time::{sleep, Duration};
-
-    const API_KEY: &str = "";
-    const ADDRESS: &str = "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae";
-    const BURN_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
-    const MINER_ADDRESS: &str = "0x9dd134d14d1e65f84b706d6f205cd5b1cd03a46b";
-    const UNUSED_ADDRESS: &str = "0xCBb08a7EF0A81817dD4D018De00311B3d0cF07c6";
-    static CLIENT: Lazy<Client> = Lazy::new(|| Client::new(API_KEY));
-
-    #[tokio::test]
-    async fn balance() -> Result<(), crate::APIError> {
-        let balance = CLIENT.balance(ADDRESS, None).await?;
-        assert_ne!(0f64, balance);
-        println!("Balance of {} is {} ETH", ADDRESS, balance);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn balance_zero() -> Result<(), crate::APIError> {
-        let balance = CLIENT.balance(UNUSED_ADDRESS, None).await?;
-        assert_eq!(0f64, balance);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn balances() -> Result<(), crate::APIError> {
-        let accounts = vec![ADDRESS, BURN_ADDRESS];
-        let balances = CLIENT.balances(accounts, None).await?;
-        assert_ne!(0, balances.len());
-        println!("{} balances available", balances.len());
-        for balance in &balances {
-            println!("{:?}", balance);
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn balances_no_results() -> Result<(), crate::APIError> {
-        let accounts = vec![UNUSED_ADDRESS];
-        let balances = CLIENT.balances(accounts, None).await?;
-        assert_eq!(1, balances.len());
-        assert_eq!(UNUSED_ADDRESS, balances[0].account);
-        assert_eq!(0f64, balances[0].balance);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn transactions() -> Result<(), crate::APIError> {
-        let transactions = CLIENT.transactions(ADDRESS).await?;
-        assert_ne!(0, transactions.len());
-        println!("Address {} has {} transactions", ADDRESS, transactions.len());
-        for transaction in &transactions {
-            println!("{:?}", transaction);
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn transactions_pages() -> Result<(), crate::APIError> {
-        let address = BURN_ADDRESS;
-        let offset = 100;
-        let transactions = CLIENT
-            .transactions_with_options(address, TransactionOptions::new_page(1, offset))
-            .await?;
-        assert_eq!(offset as usize, transactions.len());
-        let block_number = &transactions[0].block_number;
-
-        sleep(Duration::from_secs(5)).await; // API rate limiting
-
-        let transactions = CLIENT
-            .transactions_with_options(address, TransactionOptions::new_page(2, offset))
-            .await?;
-        assert_eq!(offset as usize, transactions.len());
-        assert_ne!(block_number, &transactions[0].block_number);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn transactions_sorts() -> Result<(), crate::APIError> {
-        let address = BURN_ADDRESS;
-        let offset = 1;
-        let transactions = CLIENT
-            .transactions_with_options(address, TransactionOptions::new_page_with_sort(1, offset, Sort::Ascending))
-            .await?;
-        assert_eq!(offset as usize, transactions.len());
-        let time_stamp = &transactions[0].time_stamp;
-
-        sleep(Duration::from_secs(5)).await; // API rate limiting
-
-        let transactions = CLIENT
-            .transactions_with_options(address, TransactionOptions::new_page_with_sort(1, offset, Sort::Descending))
-            .await?;
-        assert_eq!(offset as usize, transactions.len());
-        assert!(time_stamp < &transactions[0].time_stamp);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn transactions_no_results() -> Result<(), crate::APIError> {
-        let transactions = CLIENT.transactions(UNUSED_ADDRESS).await?;
-        assert_eq!(0, transactions.len());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn internal_transactions() -> Result<(), crate::APIError> {
-        let transactions = CLIENT.internal_transactions(ADDRESS).await?;
-        assert_ne!(0, transactions.len());
-        println!("Address {} has {} internal transactions", ADDRESS, transactions.len());
-        for transaction in &transactions {
-            println!("{:?}", transaction);
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn internal_transactions_for_transaction() -> Result<(), crate::APIError> {
-        let transaction_hash = "0x40eb908387324f2b575b4879cd9d7188f69c8fc9d87c901b9e2daaea4b442170";
-        let transactions = CLIENT.internal_transactions_for_transaction(transaction_hash).await?;
-        assert_ne!(0, transactions.len());
-        println!("Transaction {} has {} internal transactions", transaction_hash, transactions.len());
-        for transaction in &transactions {
-            println!("{:?}", transaction);
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn internal_transactions_no_results() -> Result<(), crate::APIError> {
-        let transactions = CLIENT.internal_transactions(UNUSED_ADDRESS).await?;
-        assert_eq!(0, transactions.len());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn erc20_token_transfers() -> Result<(), crate::APIError> {
-        let transfers = CLIENT.erc20_token_transfers(ADDRESS).await?;
-        assert_ne!(0, transfers.len());
-        println!("Address {} has {} ERC20 token transfers:", ADDRESS, transfers.len(),);
-        for transfer in &transfers {
-            println!("{:?}", transfer);
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn erc20_token_transfers_no_results() -> Result<(), crate::APIError> {
-        let transfers = CLIENT.erc20_token_transfers(UNUSED_ADDRESS).await?;
-        assert_eq!(0, transfers.len());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn erc721_token_transfers() -> Result<(), crate::APIError> {
-        let transfers = CLIENT.erc721_token_transfers(ADDRESS).await?;
-        assert_ne!(0, transfers.len());
-        println!("Address {} has {} ERC721 token transfers:", ADDRESS, transfers.len(),);
-        for transfer in &transfers {
-            println!("{:?}", transfer);
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn erc721_token_transfers_no_results() -> Result<(), crate::APIError> {
-        let transfers = CLIENT.erc721_token_transfers(UNUSED_ADDRESS).await?;
-        assert_eq!(0, transfers.len());
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn blocks_mined() -> Result<(), crate::APIError> {
-        let blocks = CLIENT.blocks_mined(MINER_ADDRESS).await?;
-        assert_ne!(0, blocks.len());
-        println!("Address {} has mined {} blocks:", MINER_ADDRESS, blocks.len(),);
-        for block in &blocks {
-            println!("{:?}", block);
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn blocks_mined_no_results() -> Result<(), crate::APIError> {
-        let blocks = CLIENT.blocks_mined(UNUSED_ADDRESS).await?;
-        assert_eq!(0, blocks.len());
-        Ok(())
     }
 }

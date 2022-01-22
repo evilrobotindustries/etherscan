@@ -1,68 +1,69 @@
-use super::{Page, Sort};
+use super::{super::BoolFromStr, Page, Sort};
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use serde_with::{serde_as, DisplayFromStr, TimestampSecondsWithFrac};
 
+#[serde_as]
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Transaction {
-    #[serde(alias = "blockNumber", deserialize_with = "super::super::de_u64_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub block_number: u64,
-    #[serde(alias = "timeStamp", deserialize_with = "super::super::de_u64_from_str")]
-    pub time_stamp: u64,
+    #[serde_as(as = "TimestampSecondsWithFrac<String>")]
+    pub time_stamp: DateTime<Utc>,
     pub hash: String,
-    #[serde(deserialize_with = "super::super::de_u64_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub nonce: u64,
-    #[serde(alias = "blockHash")]
     pub block_hash: String,
-    #[serde(alias = "transactionIndex", deserialize_with = "super::super::de_u64_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub transaction_index: u64,
     pub from: String,
     pub to: String,
-    #[serde(deserialize_with = "super::super::de_u128_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub value: u128,
-    #[serde(alias = "gas", deserialize_with = "super::super::de_u64_from_str")]
+    #[serde(alias = "gas")]
+    #[serde_as(as = "DisplayFromStr")]
     pub gas_limit: u64,
-    #[serde(alias = "gasPrice", deserialize_with = "super::super::de_u128_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub gas_price: u128,
-    #[serde(alias = "isError", deserialize_with = "super::super::de_bool_from_str")]
+    #[serde_as(as = "BoolFromStr")]
     pub is_error: bool,
     #[serde(alias = "txreceipt_status")]
-    pub txreceipt_status: String,
+    pub tx_receipt_status: String,
     pub input: String,
-    #[serde(alias = "contractAddress")]
     pub contract_address: String,
-    #[serde(alias = "cumulativeGasUsed", deserialize_with = "super::super::de_u128_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub cumulative_gas_used: u128,
-    #[serde(alias = "gasUsed", deserialize_with = "super::super::de_u128_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub gas_used: u128,
-    #[serde(deserialize_with = "super::super::de_u128_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub confirmations: u128,
 }
 
+#[serde_as]
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InternalTransaction {
-    #[serde(alias = "blockNumber", deserialize_with = "super::super::de_u64_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub block_number: u64,
-    #[serde(alias = "timeStamp", deserialize_with = "super::super::de_u64_from_str")]
-    pub time_stamp: u64,
+    #[serde_as(as = "TimestampSecondsWithFrac<String>")]
+    pub time_stamp: DateTime<Utc>,
     pub hash: Option<String>,
     pub from: String,
     pub to: String,
-    #[serde(deserialize_with = "super::super::de_u128_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub value: u128,
-    #[serde(alias = "contractAddress")]
     pub contract_address: String,
     pub input: String,
     #[serde(alias = "type")]
     pub transaction_type: String,
-    #[serde(alias = "gas", deserialize_with = "super::super::de_u64_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub gas: u64,
-    #[serde(alias = "gasUsed", deserialize_with = "super::super::de_u128_from_str")]
+    #[serde_as(as = "DisplayFromStr")]
     pub gas_used: u128,
-    #[serde(alias = "traceId")]
     pub trace_id: Option<String>,
-    /// Returns false for successful transactions and true for rejected/cancelled transactions.
-    #[serde(alias = "isError", deserialize_with = "super::super::de_bool_from_str")]
+    #[serde_as(as = "BoolFromStr")]
     pub is_error: bool,
-    #[serde(alias = "errCode")]
     pub err_code: String,
 }
 
