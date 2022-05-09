@@ -1,4 +1,5 @@
 use super::{Page, Sort};
+use crate::{Address, BlockHash, TransactionHash};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, TimestampSecondsWithFrac};
@@ -11,13 +12,13 @@ pub struct ERC20TokenTransfer {
     pub block_number: u64,
     #[serde_as(as = "TimestampSecondsWithFrac<String>")]
     pub time_stamp: DateTime<Utc>,
-    pub hash: String,
+    pub hash: TransactionHash,
     #[serde_as(as = "DisplayFromStr")]
     pub nonce: u64,
-    pub block_hash: String,
-    pub from: String,
-    pub contract_address: String,
-    pub to: String,
+    pub block_hash: BlockHash,
+    pub from: Address,
+    pub contract_address: Address,
+    pub to: Address,
     /// Value of the token transfer
     /// NOTE: Can be a very large amount, therefore currently a string
     pub value: String,
@@ -49,13 +50,13 @@ pub struct ERC721TokenTransfer {
     pub block_number: u64,
     #[serde_as(as = "TimestampSecondsWithFrac<String>")]
     pub time_stamp: DateTime<Utc>,
-    pub hash: String,
+    pub hash: TransactionHash,
     #[serde_as(as = "DisplayFromStr")]
     pub nonce: u64,
-    pub block_hash: String,
-    pub from: String,
-    pub contract_address: String,
-    pub to: String,
+    pub block_hash: BlockHash,
+    pub from: Address,
+    pub contract_address: Address,
+    pub to: Address,
     #[serde(alias = "tokenID")]
     pub token_id: String,
     pub token_name: String,

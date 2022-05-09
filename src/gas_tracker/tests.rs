@@ -7,7 +7,7 @@ static CLIENT: Lazy<Client> = Lazy::new(|| Client::new(API_KEY));
 
 #[tokio::test]
 async fn estimate_time() -> Result<(), crate::APIError> {
-    let seconds = CLIENT.estimate_time(2000000000).await?;
+    let seconds = CLIENT.estimate_time(2000000000000).await?;
     assert!(seconds > 0);
     println!("Estimated time is {seconds} seconds");
     Ok(())

@@ -1,11 +1,14 @@
 use crate::responses::ResponseStatus;
-use crate::{Result, ACTION, ADDRESS, MODULE, URI};
+use crate::{APIError, Address, BlockHash, BlockNumber, Result, TypeExtensions, ACTION, ADDRESS, MODULE, URI};
+use crate::{Tag, TAG};
+use ethabi::ethereum_types::U64;
 use serde::de::DeserializeOwned;
 use serde::{
     de,
     de::{MapAccess, Visitor},
     Deserialize, Deserializer,
 };
+use serde_with::{serde_as, DisplayFromStr};
 use std::fmt;
 use std::marker::PhantomData;
 
@@ -28,7 +31,7 @@ impl Client {
     }
 
     /// Returns the number of most recent block
-    pub async fn block_number(&self) -> Result<String> {
+    pub async fn block_number(&self) -> Result<BlockNumber> {
         let parameters = &[(MODULE, PROXY), (ACTION, "eth_blockNumber")];
         self.get(parameters).await
     }
@@ -37,12 +40,12 @@ impl Client {
     ///
     /// # Arguments
     ///
-    /// * 'block_number' - The block number, in hex
-    pub async fn block(&self, block_number: &str) -> Result<Block> {
+    /// * 'block_number' - The block number
+    pub async fn block(&self, block_number: &BlockNumber) -> Result<Block> {
         let parameters = &[
             (MODULE, PROXY),
             (ACTION, "eth_getBlockByNumber"),
-            ("tag", block_number),
+            ("tag", &TypeExtensions::format(block_number)),
             ("boolean", &false.to_string()),
         ];
         self.get(parameters).await
@@ -52,14 +55,14 @@ impl Client {
     ///
     /// # Arguments
     ///
-    /// * 'block_number' - The block number, in hex
-    pub async fn block_transactions(&self, block_number: &str) -> Result<String> {
+    /// * 'block_number' - The block number
+    pub async fn block_transactions(&self, block_number: &BlockNumber) -> Result<u64> {
         let parameters = &[
             (MODULE, PROXY),
             (ACTION, "eth_getBlockTransactionCountByNumber"),
-            ("tag", block_number),
+            (TAG, &TypeExtensions::format(block_number)),
         ];
-        self.get(parameters).await
+        self.get::<U64>(parameters).await.map(|t| t.as_u64())
     }
 
     /// Executes a new message call immediately without creating a transaction on the block chain
@@ -68,13 +71,14 @@ impl Client {
     ///
     /// * 'contract_address' - The contract address to interact with
     /// * 'data' - The hash of the method signature and encoded parameters
-    pub async fn call(&self, contract_address: &str, data: &str) -> Result<String> {
+    /// * 'tag' - The pre-defined block parameter, which defaults to latest if not provided.
+    pub async fn call(&self, contract_address: &Address, data: &str, tag: Option<Tag>) -> Result<String> {
         let parameters = &[
             (MODULE, PROXY),
             (ACTION, "eth_call"),
-            ("to", contract_address),
+            ("to", &TypeExtensions::format(contract_address)),
             ("data", data),
-            ("tag", "latest"), // the pre-defined block parameter, either earliest, pending or latest
+            (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()), // the pre-defined block parameter, either earliest, pending or latest
         ];
         self.get(parameters).await
     }
@@ -88,52 +92,53 @@ impl Client {
     /// * 'value' - the value sent in this transaction, in hex
     /// * 'gas' - the amount of gas provided for the transaction, in hex
     /// * 'gas_price' - the gas price paid for each unit of gas, in wei
-    pub async fn estimate_gas(&self, contract_address: &str, data: &str, value: &str, gas: &str, gas_price: &str) -> Result<String> {
+    pub async fn estimate_gas(&self, contract_address: &Address, data: &str, value: &str, gas: u64, gas_price: u64) -> Result<String> {
         let parameters = &[
             (MODULE, PROXY),
             (ACTION, "eth_estimateGas"),
-            ("to", contract_address),
+            ("to", &TypeExtensions::format(contract_address)),
             ("data", data),
             ("value", value),
-            ("gas", gas),
-            ("gasPrice", gas_price),
+            ("gas", &TypeExtensions::format(&gas)),
+            ("gasPrice", &TypeExtensions::format(&gas_price)),
         ];
         self.get(parameters).await
     }
 
     /// Returns the current price per gas in wei
-    pub async fn gas_price(&self) -> Result<String> {
+    pub async fn gas_price(&self) -> Result<u64> {
         let parameters = &[(MODULE, PROXY), (ACTION, "eth_gasPrice")];
-        self.get(parameters).await
+        self.get::<U64>(parameters).await.map(|t| t.as_u64())
     }
 
-    /// Returns the number of transactions performed by an address
+    /// Returns the number of outgoing transactions sent by an address
     ///
     /// # Arguments
     ///
     /// * 'address' - The address to get the number of transactions performed
-    pub async fn transactions(&self, address: &str) -> Result<String> {
+    /// * 'tag' - The pre-defined block parameter, which defaults to latest if not provided.
+    pub async fn transactions(&self, address: &Address, tag: Option<Tag>) -> Result<u64> {
         let parameters = &[
             (MODULE, PROXY),
             (ACTION, "eth_getTransactionCount"),
-            (ADDRESS, address),
-            ("tag", "latest"), // the string pre-defined block parameter, either earliest, pending or latest
+            (ADDRESS, &TypeExtensions::format(address)),
+            (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
         ];
-        self.get(parameters).await
+        self.get::<U64>(parameters).await.map(|t| t.as_u64())
     }
 
     /// Returns information about a uncle by block number.
     ///
     /// # Arguments
     ///
-    /// * 'block_number' - The block number, in hex
-    /// * 'index' - the position of the uncle's index in the block, in hex
-    pub async fn uncle(&self, block_number: &str, index: &str) -> Result<Block> {
+    /// * 'block_number' - The block number
+    /// * 'index' - the position of the uncle's index in the block
+    pub async fn uncle(&self, block_number: BlockNumber, index: u8) -> Result<Block> {
         let parameters = &[
             (MODULE, PROXY),
             (ACTION, "eth_getUncleByBlockNumberAndIndex"),
-            ("tag", block_number),
-            ("index", index),
+            (TAG, &TypeExtensions::format(&block_number)),
+            ("index", &TypeExtensions::format(&index)),
         ];
         self.get(parameters).await
     }
@@ -148,10 +153,11 @@ impl Client {
             .json::<Response<T>>()
             .await
             .map(|r| r.result)
-            .map_err(|e| crate::map_error(e))
+            .map_err(|e| APIError::from(e))
     }
 }
 
+#[serde_as]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Block {
@@ -160,13 +166,14 @@ pub struct Block {
     pub extra_data: String,
     pub gas_limit: String,
     pub gas_used: String,
-    pub hash: String,
+    pub hash: BlockHash,
     pub logs_bloom: String,
     pub miner: String,
     pub mix_hash: String,
     pub nonce: String,
-    pub number: String,
-    pub parent_hash: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub number: BlockNumber,
+    pub parent_hash: Option<BlockHash>,
     pub receipts_root: String,
     pub sha3_uncles: String,
     pub size: String,

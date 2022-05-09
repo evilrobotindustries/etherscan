@@ -1,5 +1,4 @@
 use super::Client;
-use crate::contracts::Descriptor;
 use once_cell::sync::Lazy;
 
 const API_KEY: &str = "";
@@ -12,7 +11,6 @@ static CLIENT: Lazy<Client> = Lazy::new(|| Client::new(API_KEY));
 #[tokio::test]
 async fn get_abi() -> Result<(), crate::APIError> {
     let abi = CLIENT.get_abi(ADDRESS).await?;
-    assert!(abi.len() > 0);
     println!("ABI of {} is \n{:#?}", ADDRESS, abi);
     Ok(())
 }
@@ -20,7 +18,6 @@ async fn get_abi() -> Result<(), crate::APIError> {
 #[tokio::test]
 async fn get_abi_erc721() -> Result<(), crate::APIError> {
     let abi = CLIENT.get_abi(ERC721_ADDRESS).await?;
-    assert!(abi.len() > 0);
     println!("ABI of {} is \n{:#?}", ERC721_ADDRESS, abi);
     Ok(())
 }
@@ -47,47 +44,20 @@ async fn get_abi_invalid_address() -> Result<(), crate::APIError> {
 async fn get_source_code() -> Result<(), crate::APIError> {
     let contracts = CLIENT.get_source_code(ADDRESS).await?;
     for contract in contracts {
-        println!("Contract details for {ADDRESS}:");
-
         assert_ne!(0, contract.source_code.len());
-        //println!("Source code of {} is {}", ADDRESS, contract.source_code);
-
-        assert_ne!(0, contract.abi.len());
-        println!("ABI:                      {}", contract.abi);
-
         assert_ne!(0, contract.contract_name.len());
-        println!("Contract name:            {}", contract.contract_name);
-
         assert_ne!(0, contract.compiler_version.len());
-        println!("Compiler version:         {}", contract.compiler_version);
-
         assert!(contract.optimization_used);
         assert!(contract.runs > 0);
-        println!(
-            "Optimisation Enabled:     {} with {} runs",
-            contract.optimization_used, contract.runs
-        );
-
         assert_ne!(0, contract.constructor_arguments.len());
-        println!("Constructor arguments:    {}", contract.constructor_arguments);
-
         assert_ne!(0, contract.evm_version.len());
-        println!("EVM version:              {}", contract.evm_version);
-
         assert_eq!(0, contract.library.len());
-        println!("Library:                  {}", contract.library);
-
         assert_eq!(0, contract.license_type.len());
-        println!("License type:             {}", contract.license_type);
-
         assert!(!contract.proxy);
-        println!("Proxy:                    {}", contract.proxy);
-
         assert_eq!(0, contract.implementation.len());
-        println!("Implementation:           {}", contract.implementation);
-
         assert_eq!(0, contract.swarm_source.len());
-        println!("Swarm source:             {}", contract.swarm_source);
+
+        println!("Contract details for {ADDRESS}:\n{:#?}", contract);
     }
 
     Ok(())

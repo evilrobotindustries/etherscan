@@ -1,4 +1,5 @@
 use super::{super::BoolFromStr, Page, Sort};
+use crate::{BlockHash, TransactionHash};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, TimestampSecondsWithFrac};
@@ -11,10 +12,10 @@ pub struct Transaction {
     pub block_number: u64,
     #[serde_as(as = "TimestampSecondsWithFrac<String>")]
     pub time_stamp: DateTime<Utc>,
-    pub hash: String,
+    pub hash: TransactionHash,
     #[serde_as(as = "DisplayFromStr")]
     pub nonce: u64,
-    pub block_hash: String,
+    pub block_hash: BlockHash,
     #[serde_as(as = "DisplayFromStr")]
     pub transaction_index: u64,
     pub from: String,
@@ -48,7 +49,7 @@ pub struct InternalTransaction {
     pub block_number: u64,
     #[serde_as(as = "TimestampSecondsWithFrac<String>")]
     pub time_stamp: DateTime<Utc>,
-    pub hash: Option<String>,
+    pub hash: Option<TransactionHash>,
     pub from: String,
     pub to: String,
     #[serde_as(as = "DisplayFromStr")]

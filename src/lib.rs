@@ -4,17 +4,23 @@ mod gas_tracker;
 mod proxy;
 mod responses;
 
-use serde::{de, de::DeserializeOwned, Deserialize, Deserializer};
+use serde::{de, de::DeserializeOwned, Deserialize};
 use serde_with::DeserializeAs;
 use std::error::Error;
+use std::fmt::Debug;
 
 const URI: &str = "https://api.etherscan.io/api";
 const MODULE: &str = "module";
 const ACTION: &str = "action";
 const ADDRESS: &str = "address";
+const TAG: &str = "tag";
 const WEI_TO_ETH: f64 = 1_000_000_000_000_000_000f64;
 
 type Result<T> = std::result::Result<T, crate::APIError>;
+pub type Address = ethabi::Address;
+pub type BlockHash = ethabi::ethereum_types::H256;
+pub type BlockNumber = ethabi::ethereum_types::U64;
+pub type TransactionHash = ethabi::ethereum_types::H256;
 
 pub struct Client {
     api_key: String,
@@ -39,34 +45,8 @@ impl Client {
             .json::<responses::Response<T>>()
             .await
             .map(|r| r.result)
-            .map_err(|e| map_error(e))
+            .map_err(|e| APIError::from(e))
     }
-}
-
-fn map_error(e: reqwest::Error) -> APIError {
-    if e.is_decode() {
-        if let Some(source) = e.source() {
-            let source = source.downcast_ref::<serde_json::Error>().expect("serde_json error expected.");
-            let source_message = source
-                .to_string()
-                .replace(&format!(" at line {} column {}", source.line(), source.column()), "");
-            match source_message.as_str() {
-                "Max rate limit reached, please use API Key for higher rate limit" => {
-                    return APIError::RateLimitReached { message: source_message }
-                }
-                "Max rate limit reached" => return APIError::RateLimitReached { message: source_message },
-                "Invalid API Key" => return APIError::InvalidAPIKey { message: source_message },
-                "Too many invalid api key attempts, please try again later" => return APIError::InvalidAPIKey { message: source_message },
-                "Contract source code not verified" => return APIError::ContractNotVerified,
-                "Invalid Address format" => return APIError::InvalidAddress,
-                _ => {}
-            };
-            return APIError::DeserializationError {
-                message: source.to_string(),
-            };
-        }
-    }
-    APIError::TransportError { source: e }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -90,9 +70,34 @@ pub enum APIError {
     },
 }
 
-fn de_wei_to_eth<'a, D: Deserializer<'a>>(deserializer: D) -> std::result::Result<f64, D::Error> {
-    let str_val = String::deserialize(deserializer)?;
-    str_val.parse::<u128>().map(wei_to_eth).map_err(de::Error::custom)
+impl APIError {
+    fn from(e: reqwest::Error) -> APIError {
+        if e.is_decode() {
+            if let Some(source) = e.source() {
+                let source = source.downcast_ref::<serde_json::Error>().expect("serde_json error expected.");
+                let source_message = source
+                    .to_string()
+                    .replace(&format!(" at line {} column {}", source.line(), source.column()), "");
+                match source_message.as_str() {
+                    "Max rate limit reached, please use API Key for higher rate limit" => {
+                        return APIError::RateLimitReached { message: source_message }
+                    }
+                    "Max rate limit reached" => return APIError::RateLimitReached { message: source_message },
+                    "Invalid API Key" => return APIError::InvalidAPIKey { message: source_message },
+                    "Too many invalid api key attempts, please try again later" => {
+                        return APIError::InvalidAPIKey { message: source_message }
+                    }
+                    "Contract source code not verified" => return APIError::ContractNotVerified,
+                    "Invalid Address format" => return APIError::InvalidAddress,
+                    _ => {}
+                };
+                return APIError::DeserializationError {
+                    message: source.to_string(),
+                };
+            }
+        }
+        APIError::TransportError { source: e }
+    }
 }
 
 fn wei_to_eth(value: u128) -> f64 {
@@ -114,5 +119,58 @@ impl<'de> DeserializeAs<'de, f64> for WeiToEth {
     fn deserialize_as<D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<f64, D::Error> {
         let s = String::deserialize(deserializer).map_err(de::Error::custom)?;
         s.parse::<u128>().map(wei_to_eth).map_err(de::Error::custom)
+    }
+}
+
+pub trait TypeExtensions {
+    fn format(&self) -> String;
+}
+
+impl TypeExtensions for Address {
+    fn format(&self) -> String {
+        let address: ethabi::Address = self.0.into();
+        format!("{:#x}", address)
+    }
+}
+
+impl TypeExtensions for TransactionHash {
+    fn format(&self) -> String {
+        let hash: TransactionHash = self.0.into();
+        format!("{:#x}", hash)
+    }
+}
+
+impl TypeExtensions for BlockNumber {
+    fn format(&self) -> String {
+        let block_number = self.0[0];
+        format!("{:#x}", block_number)
+    }
+}
+
+impl TypeExtensions for u64 {
+    fn format(&self) -> String {
+        format!("{:#x}", self)
+    }
+}
+
+impl TypeExtensions for u8 {
+    fn format(&self) -> String {
+        format!("{:#x}", self)
+    }
+}
+
+pub enum Tag {
+    Earliest,
+    Pending,
+    Latest,
+}
+
+impl Tag {
+    fn to_string(&self) -> &'static str {
+        match self {
+            Tag::Latest => "latest",
+            Tag::Earliest => "earliest",
+            Tag::Pending => "pending",
+        }
     }
 }
