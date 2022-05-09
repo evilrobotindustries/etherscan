@@ -8,15 +8,7 @@ use std::marker::PhantomData;
 
 #[derive(Debug)]
 pub struct Response<T> {
-    pub status: ResponseStatus,
-    pub message: String,
     pub result: T,
-}
-
-impl<T> Response<T> {
-    pub fn new(status: ResponseStatus, message: String, result: T) -> Response<T> {
-        Response { status, message, result }
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -29,6 +21,10 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Response<T> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         struct ResultVisitor<T>(PhantomData<fn() -> T>);
 
+        const STATUS: &str = "status";
+        const MESSAGE: &str = "message";
+        const RESULT: &str = "result";
+
         impl<'de, T: Deserialize<'de>> Visitor<'de> for ResultVisitor<T> {
             type Value = Response<T>;
 
@@ -37,12 +33,8 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Response<T> {
             }
 
             fn visit_map<V: MapAccess<'de>>(self, mut map: V) -> std::result::Result<Response<T>, V::Error> {
-                const STATUS: &str = "status";
-                const MESSAGE: &str = "message";
-                const RESULT: &str = "result";
-
                 let mut status = None;
-                let mut message = None;
+                let mut message: Option<String> = None;
                 let mut result = None;
                 while let Some(key) = map.next_key()? {
                     match key {
@@ -96,17 +88,20 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Response<T> {
 
                             result = Some(map.next_value()?);
                         }
-                        _ => {}
+                        _ => {
+                            // Ignore value
+                            let _ = map.next_value::<()>();
+                        }
                     }
                 }
-                let status = status.ok_or_else(|| de::Error::missing_field("status"))?;
-                let message = message.ok_or_else(|| de::Error::missing_field("message"))?;
-                let result = result.ok_or_else(|| de::Error::missing_field("result"))?;
-                Ok(Response::<T>::new(status, message, result))
+                status.ok_or_else(|| de::Error::missing_field(STATUS))?;
+                message.ok_or_else(|| de::Error::missing_field(MESSAGE))?;
+                let result = result.ok_or_else(|| de::Error::missing_field(RESULT))?;
+                Ok(Response::<T> { result })
             }
         }
 
-        const FIELDS: &[&str] = &["status", "message", "result"];
-        deserializer.deserialize_struct("Duration", FIELDS, ResultVisitor(PhantomData))
+        const FIELDS: &[&str] = &[STATUS, MESSAGE, RESULT];
+        deserializer.deserialize_struct("Response", FIELDS, ResultVisitor(PhantomData))
     }
 }

@@ -1,8 +1,3 @@
-#[cfg(test)]
-mod tests;
-mod tokens;
-mod transactions;
-
 use super::{Result, WeiToEth};
 use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
@@ -10,8 +5,12 @@ use serde_with::{serde_as, DisplayFromStr, TimestampSecondsWithFrac};
 use tokens::{ERC20TokenTransfer, ERC721TokenTransfer};
 use transactions::{InternalTransaction, Transaction, TransactionOptions};
 
+#[cfg(test)]
+mod tests;
+mod tokens;
+mod transactions;
+
 const ACCOUNT: &str = "account";
-const ADDRESS: &str = "address";
 const CONTRACT_ADDRESS: &str = "contractaddress";
 const END_BLOCK: &str = "endblock";
 const ERC20_TOKEN_TRANSFERS: &str = "tokentx";
@@ -48,8 +47,8 @@ impl Client {
             (ADDRESS, address),
             (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
         ];
-        let b = self.client.get::<String>(parameters).await?;
-        b.parse::<u128>().map(super::wei_to_eth).or(Ok(f64::NAN))
+        let balance = self.client.get::<String>(parameters).await?;
+        balance.parse::<u128>().map(super::wei_to_eth).or(Ok(f64::NAN))
     }
 
     /// Returns the balances for multiple given addresses (max 20).
@@ -334,7 +333,7 @@ impl Client {
 }
 
 use crate::accounts::tokens::TokenOptions;
-use crate::{APIError, ACTION, MODULE};
+use crate::{APIError, ACTION, ADDRESS, MODULE};
 use serde::Deserialize;
 
 #[serde_as]
