@@ -4,7 +4,7 @@ mod gas_tracker;
 mod proxy;
 mod responses;
 
-use serde::{de, de::DeserializeOwned, Deserialize};
+use serde::{de, de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::DeserializeAs;
 use std::error::Error;
 use std::fmt::Debug;
@@ -61,6 +61,8 @@ pub enum APIError {
     InvalidAPIKey { message: String },
     #[error("Rate Limit Reached")]
     RateLimitReached { message: String },
+    #[error("RPC Error")]
+    RPCError { code: i16, message: String },
     #[error("Too many addresses provided (max 20)")]
     TooManyAddresses,
     #[error("Request error")]
@@ -91,6 +93,14 @@ impl APIError {
                     "Invalid Address format" => return APIError::InvalidAddress,
                     _ => {}
                 };
+                if source_message.starts_with("rpc error:") {
+                    if let Ok(error) = serde_json::from_str::<RPCError>(&source_message[10..]) {
+                        return APIError::RPCError {
+                            code: error.code,
+                            message: error.message,
+                        };
+                    }
+                }
                 return APIError::DeserializationError {
                     message: source.to_string(),
                 };
@@ -98,6 +108,12 @@ impl APIError {
         }
         APIError::TransportError { source: e }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+struct RPCError {
+    code: i16,
+    message: String,
 }
 
 fn wei_to_eth(value: u128) -> f64 {
@@ -154,6 +170,12 @@ impl TypeExtensions for u64 {
 }
 
 impl TypeExtensions for u8 {
+    fn format(&self) -> String {
+        format!("{:#x}", self)
+    }
+}
+
+impl TypeExtensions for u16 {
     fn format(&self) -> String {
         format!("{:#x}", self)
     }
