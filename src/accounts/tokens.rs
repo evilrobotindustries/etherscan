@@ -1,5 +1,5 @@
 use super::{Page, Sort};
-use crate::{Address, BlockHash, TransactionHash};
+use crate::{Address, BlockHash, BlockNumber, TransactionHash};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, TimestampSecondsWithFrac};
@@ -8,8 +8,8 @@ use serde_with::{serde_as, DisplayFromStr, TimestampSecondsWithFrac};
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ERC20TokenTransfer {
-    #[serde_as(as = "DisplayFromStr")]
-    pub block_number: u64,
+    #[serde(deserialize_with = "crate::de_string_to_block_number")]
+    pub block_number: BlockNumber,
     #[serde_as(as = "TimestampSecondsWithFrac<String>")]
     pub time_stamp: DateTime<Utc>,
     pub hash: TransactionHash,
@@ -46,8 +46,8 @@ pub struct ERC20TokenTransfer {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ERC721TokenTransfer {
-    #[serde_as(as = "DisplayFromStr")]
-    pub block_number: u64,
+    #[serde(deserialize_with = "crate::de_string_to_block_number")]
+    pub block_number: BlockNumber,
     #[serde_as(as = "TimestampSecondsWithFrac<String>")]
     pub time_stamp: DateTime<Utc>,
     pub hash: TransactionHash,
@@ -58,7 +58,7 @@ pub struct ERC721TokenTransfer {
     pub contract_address: Address,
     pub to: Address,
     #[serde(alias = "tokenID")]
-    pub token_id: String,
+    pub token_id: String, // ENS token ids can be very large
     pub token_name: String,
     pub token_symbol: String,
     #[serde_as(as = "DisplayFromStr")]

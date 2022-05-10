@@ -57,7 +57,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Response<T> {
 
                             if let Some(ResponseStatus::Failed) = status {
                                 if let Some(message) = { &message } {
-                                    if message == "NOTOK" {
+                                    if message.starts_with("NOTOK") {
                                         // Get message from next value
                                         let next: Option<(String, String)> = map.next_entry()?;
                                         if let Some((_, value)) = next {

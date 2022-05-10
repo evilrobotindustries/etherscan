@@ -1,20 +1,23 @@
-mod accounts;
-mod contracts;
-mod gas_tracker;
-mod proxy;
-mod responses;
-
-use serde::{de, de::DeserializeOwned, Deserialize, Serialize};
+use serde::de::Error as SerdeError;
+use serde::{de, de::DeserializeOwned, Deserialize, Deserializer, Serialize};
 use serde_with::DeserializeAs;
 use std::error::Error;
 use std::fmt::Debug;
+use std::str::FromStr;
+
+mod accounts;
+mod blocks;
+mod contracts;
+mod convert;
+mod gas_tracker;
+mod proxy;
+mod responses;
 
 const URI: &str = "https://api.etherscan.io/api";
 const MODULE: &str = "module";
 const ACTION: &str = "action";
 const ADDRESS: &str = "address";
 const TAG: &str = "tag";
-const WEI_TO_ETH: f64 = 1_000_000_000_000_000_000f64;
 
 type Result<T> = std::result::Result<T, crate::APIError>;
 pub type Address = ethabi::Address;
@@ -116,25 +119,12 @@ struct RPCError {
     message: String,
 }
 
-fn wei_to_eth(value: u128) -> f64 {
-    value as f64 / WEI_TO_ETH
-}
-
 struct BoolFromStr;
 
 impl<'de> DeserializeAs<'de, bool> for BoolFromStr {
     fn deserialize_as<D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<bool, D::Error> {
         let s = String::deserialize(deserializer).map_err(de::Error::custom)?;
         Ok(s == "1")
-    }
-}
-
-struct WeiToEth;
-
-impl<'de> DeserializeAs<'de, f64> for WeiToEth {
-    fn deserialize_as<D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<f64, D::Error> {
-        let s = String::deserialize(deserializer).map_err(de::Error::custom)?;
-        s.parse::<u128>().map(wei_to_eth).map_err(de::Error::custom)
     }
 }
 
@@ -195,4 +185,9 @@ impl Tag {
             Tag::Pending => "pending",
         }
     }
+}
+
+fn de_string_to_block_number<'a, D: Deserializer<'a>>(deserializer: D) -> std::result::Result<BlockNumber, D::Error> {
+    let value = String::deserialize(deserializer)?;
+    u64::from_str(&value).map(|v| BlockNumber::from(v)).map_err(D::Error::custom)
 }

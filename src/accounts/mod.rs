@@ -1,6 +1,9 @@
-use super::{Result, WeiToEth};
+use super::Result;
+use crate::accounts::tokens::TokenOptions;
+use crate::{APIError, Address, BlockNumber, Tag, TransactionHash, TypeExtensions, ACTION, ADDRESS, MODULE, TAG};
 use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, TimestampSecondsWithFrac};
 use tokens::{ERC20TokenTransfer, ERC721TokenTransfer};
 use transactions::{InternalTransaction, Transaction, TransactionOptions};
@@ -33,21 +36,24 @@ impl Client {
         }
     }
 
-    /// Returns the balance of a given address.
+    pub fn from(client: super::Client) -> Client {
+        Client { client }
+    }
+
+    /// Returns the balance of a given address in wei.
     ///
     /// # Arguments
     ///
     /// * 'address' - An address
     /// * 'tag' - The pre-defined block parameter, which defaults to latest if not provided.
-    pub async fn balance(&self, address: &Address, tag: Option<Tag>) -> Result<f64> {
+    pub async fn balance(&self, address: &Address, tag: Option<Tag>) -> Result<u128> {
         let parameters = &[
             (MODULE, ACCOUNT),
             (ACTION, "balance"),
             (ADDRESS, &TypeExtensions::format(address)),
             (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
         ];
-        let balance = self.client.get::<String>(parameters).await?;
-        balance.parse::<u128>().map(super::wei_to_eth).or(Ok(f64::NAN))
+        self.client.get::<String>(parameters).await.map(|v| v.parse::<u128>().unwrap_or(0))
     }
 
     /// Returns the balances for multiple given addresses (max 20).
@@ -82,6 +88,8 @@ impl Client {
     /// # Arguments
     ///
     /// * 'address' - An address.
+    ///
+    /// **Note:** This API endpoint returns a maximum of 10,000 records only.
     pub async fn transactions(&self, address: &Address) -> Result<Vec<Transaction>> {
         self.client
             .get::<Vec<Transaction>>(&[
@@ -108,6 +116,8 @@ impl Client {
     /// # Arguments
     ///
     /// * 'address' - An address
+    ///
+    /// **Note:** This API endpoint returns a maximum of 10,000 records only.
     pub async fn internal_transactions(&self, address: &Address) -> Result<Vec<InternalTransaction>> {
         let parameters = &[
             (MODULE, ACCOUNT),
@@ -122,6 +132,8 @@ impl Client {
     /// # Arguments
     ///
     /// * 'hash' - A transaction hash.
+    ///
+    /// **Note:** This API endpoint returns a maximum of 10,000 records only.
     pub async fn internal_transactions_for_transaction(&self, hash: &TransactionHash) -> Result<Vec<InternalTransaction>> {
         let parameters = &[
             (MODULE, ACCOUNT),
@@ -137,6 +149,8 @@ impl Client {
     ///
     /// * 'address' - An address
     /// * 'options' - Additional options.
+    ///
+    /// **Note:** This API endpoint returns a maximum of 10,000 records only.
     pub async fn internal_transactions_with_options(
         &self,
         address: &Address,
@@ -360,23 +374,17 @@ impl Client {
     }
 }
 
-use crate::accounts::tokens::TokenOptions;
-use crate::{APIError, Address, BlockNumber, Tag, TransactionHash, TypeExtensions, ACTION, ADDRESS, MODULE, TAG};
-use serde::Deserialize;
-
-#[serde_as]
 #[derive(Debug, Deserialize)]
 pub struct Balance {
     pub account: Address,
-    #[serde_as(as = "WeiToEth")]
-    pub balance: f64,
+    pub balance: u128,
 }
 
 #[serde_as]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Block {
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(deserialize_with = "crate::de_string_to_block_number")]
     pub block_number: BlockNumber,
     #[serde_as(as = "TimestampSecondsWithFrac<String>")]
     pub time_stamp: DateTime<Utc>,

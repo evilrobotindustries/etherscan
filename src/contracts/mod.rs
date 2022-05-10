@@ -1,5 +1,6 @@
 use super::{BoolFromStr, Result, ACTION, MODULE};
-use crate::{APIError, ADDRESS};
+use crate::{APIError, TypeExtensions, ADDRESS};
+use ethabi::Address;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 use serde_with::{serde_as, DisplayFromStr};
@@ -23,13 +24,17 @@ impl Client {
         }
     }
 
+    pub fn from(client: super::Client) -> Client {
+        Client { client }
+    }
+
     /// Returns the Contract Application Binary Interface ( ABI ) of a verified smart contract.
     ///
     /// # Arguments
     ///
     /// * 'address' - A contract address that has verified source code
-    pub async fn get_abi(&self, address: &str) -> Result<ABI> {
-        let parameters = &[(MODULE, CONTRACT), (ACTION, "getabi"), (ADDRESS, address)];
+    pub async fn get_abi(&self, address: &Address) -> Result<ABI> {
+        let parameters = &[(MODULE, CONTRACT), (ACTION, "getabi"), (ADDRESS, &TypeExtensions::format(address))];
         let abi: String = self.client.get(parameters).await?;
         ABI::load(abi.as_bytes()).map_err(|e| APIError::DeserializationError { message: e.to_string() })
     }
@@ -39,8 +44,12 @@ impl Client {
     /// # Arguments
     ///
     /// * 'address' - A contract address that has verified source code
-    pub async fn get_source_code(&self, address: &str) -> Result<Vec<Contract>> {
-        let parameters = &[(MODULE, CONTRACT), (ACTION, "getsourcecode"), (ADDRESS, address)];
+    pub async fn get_source_code(&self, address: &Address) -> Result<Vec<Contract>> {
+        let parameters = &[
+            (MODULE, CONTRACT),
+            (ACTION, "getsourcecode"),
+            (ADDRESS, &TypeExtensions::format(address)),
+        ];
         self.client.get(parameters).await
     }
 }

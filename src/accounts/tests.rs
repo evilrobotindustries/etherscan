@@ -1,6 +1,6 @@
 use super::Client;
 use crate::accounts::{transactions::TransactionOptions, BlockType, Page, Sort};
-use crate::{Address, TransactionHash};
+use crate::{convert, Address, BlockNumber, TransactionHash};
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 use tokio::time::{sleep, Duration};
@@ -17,7 +17,7 @@ static CLIENT: Lazy<Client> = Lazy::new(|| Client::new(API_KEY));
 #[tokio::test]
 async fn balance() -> Result<(), crate::APIError> {
     let address = Address::from_str(ADDRESS).expect("could not parse {ADDRESS} as address");
-    let balance = CLIENT.balance(&address, None).await?;
+    let balance = convert::wei_to_eth(CLIENT.balance(&address, None).await?);
     assert_ne!(0f64, balance);
     println!("Balance of {} is {} ETH", address, balance);
     Ok(())
@@ -27,7 +27,7 @@ async fn balance() -> Result<(), crate::APIError> {
 async fn balance_zero() -> Result<(), crate::APIError> {
     let address = Address::from_str(UNUSED_ADDRESS).expect("could not parse {UNUSED_ADDRESS} as address");
     let balance = CLIENT.balance(&address, None).await?;
-    assert_eq!(0f64, balance);
+    assert_eq!(0, balance);
     Ok(())
 }
 
@@ -51,7 +51,7 @@ async fn balances_no_results() -> Result<(), crate::APIError> {
     let balances = CLIENT.balances(vec![&address], None).await?;
     assert_eq!(1, balances.len());
     assert_eq!(address, balances[0].account);
-    assert_eq!(0f64, balances[0].balance);
+    assert_eq!(0, balances[0].balance);
     Ok(())
 }
 
@@ -61,6 +61,7 @@ async fn transactions() -> Result<(), crate::APIError> {
     let transactions = CLIENT.transactions(&address).await?;
     assert_ne!(0, transactions.len());
     println!("Address {} has {} transactions", address, transactions.len());
+    assert_eq!(BlockNumber::from(54092), transactions[0].block_number);
     for transaction in &transactions {
         println!("{:?}", transaction);
     }
@@ -123,6 +124,7 @@ async fn internal_transactions() -> Result<(), crate::APIError> {
     let transactions = CLIENT.internal_transactions(&address).await?;
     assert_ne!(0, transactions.len());
     println!("Address {} has {} internal transactions", address, transactions.len());
+    assert_eq!(BlockNumber::from(92038), transactions[0].block_number);
     for transaction in &transactions {
         println!("{:?}", transaction);
     }
@@ -156,6 +158,7 @@ async fn erc20_token_transfers() -> Result<(), crate::APIError> {
     let transfers = CLIENT.erc20_token_transfers_by_address(&address).await?;
     assert_ne!(0, transfers.len());
     println!("Address {} has {} ERC20 token transfers", address, transfers.len(),);
+    assert_eq!(BlockNumber::from(4041874), transfers[0].block_number);
     Ok(())
 }
 
@@ -173,6 +176,7 @@ async fn erc721_token_transfers_by_address() -> Result<(), crate::APIError> {
     let transfers = CLIENT.erc721_token_transfers_by_address(&address).await?;
     assert_ne!(0, transfers.len());
     println!("Address {} has {} ERC721 token transfers", address, transfers.len(),);
+    assert_eq!(BlockNumber::from(7739128), transfers[0].block_number);
     Ok(())
 }
 

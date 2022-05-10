@@ -1,5 +1,5 @@
 use super::{super::BoolFromStr, Page, Sort};
-use crate::{BlockHash, TransactionHash};
+use crate::{Address, BlockHash, BlockNumber, TransactionHash};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr, TimestampSecondsWithFrac};
@@ -8,8 +8,8 @@ use serde_with::{serde_as, DisplayFromStr, TimestampSecondsWithFrac};
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Transaction {
-    #[serde_as(as = "DisplayFromStr")]
-    pub block_number: u64,
+    #[serde(deserialize_with = "crate::de_string_to_block_number")]
+    pub block_number: BlockNumber,
     #[serde_as(as = "TimestampSecondsWithFrac<String>")]
     pub time_stamp: DateTime<Utc>,
     pub hash: TransactionHash,
@@ -45,13 +45,13 @@ pub struct Transaction {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InternalTransaction {
-    #[serde_as(as = "DisplayFromStr")]
-    pub block_number: u64,
+    #[serde(deserialize_with = "crate::de_string_to_block_number")]
+    pub block_number: BlockNumber,
     #[serde_as(as = "TimestampSecondsWithFrac<String>")]
     pub time_stamp: DateTime<Utc>,
     pub hash: Option<TransactionHash>,
-    pub from: String,
-    pub to: String,
+    pub from: Address,
+    pub to: Address,
     #[serde_as(as = "DisplayFromStr")]
     pub value: u128,
     pub contract_address: String,

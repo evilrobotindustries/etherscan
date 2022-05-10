@@ -18,6 +18,10 @@ impl Client {
         }
     }
 
+    pub fn from(client: super::Client) -> Client {
+        Client { client }
+    }
+
     /// Returns the estimated time, in seconds, for a transaction to be confirmed on the blockchain
     ///
     /// # Arguments
