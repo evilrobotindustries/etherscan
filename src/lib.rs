@@ -12,6 +12,7 @@ mod convert;
 mod gas_tracker;
 mod proxy;
 mod responses;
+mod transactions;
 
 const URI: &str = "https://api.etherscan.io/api";
 const MODULE: &str = "module";
