@@ -1,7 +1,5 @@
 use super::Client;
-use crate::blocks::Closest;
-use crate::{BlockNumber, TransactionHash};
-use chrono::{TimeZone, Utc};
+use crate::TransactionHash;
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 

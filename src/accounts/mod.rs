@@ -160,6 +160,22 @@ impl Client {
             .await
     }
 
+    /// Returns the current balance of an ERC-20 token of an address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    /// * 'contract_address' - A contract address
+    pub async fn erc20_token_balance(&self, address: &Address, contract_address: &Address) -> Result<u128> {
+        let parameters = &[
+            (MODULE, ACCOUNT),
+            (ACTION, "tokenbalance"),
+            (ADDRESS, &TypeExtensions::format(address)),
+            (CONTRACT_ADDRESS, &TypeExtensions::format(contract_address)),
+        ];
+        self.client.get::<String>(parameters).await.map(|v| v.parse::<u128>().unwrap_or(0))
+    }
+
     /// Returns the ERC20 token transfers for a given address and contract address.
     ///
     /// # Arguments
@@ -374,9 +390,11 @@ impl Client {
     }
 }
 
+#[serde_as]
 #[derive(Debug, Deserialize)]
 pub struct Balance {
     pub account: Address,
+    #[serde_as(as = "DisplayFromStr")]
     pub balance: u128,
 }
 
