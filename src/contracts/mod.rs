@@ -11,7 +11,7 @@ mod tests;
 
 const CONTRACT: &str = "contract";
 
-type ABI = ethabi::Contract;
+pub type ABI = ethabi::Contract;
 
 pub struct Client {
     client: super::Client,

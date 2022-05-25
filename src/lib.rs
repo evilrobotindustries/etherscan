@@ -5,15 +5,15 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-mod accounts;
-mod blocks;
-mod contracts;
-mod convert;
-mod gas_tracker;
-mod proxy;
-mod responses;
-mod stats;
-mod transactions;
+pub mod accounts;
+pub mod blocks;
+pub mod contracts;
+pub mod convert;
+pub mod gas_tracker;
+pub mod proxy;
+pub mod responses;
+pub mod stats;
+pub mod transactions;
 
 const URI: &str = "https://api.etherscan.io/api";
 const MODULE: &str = "module";
@@ -27,13 +27,14 @@ pub type BlockHash = ethabi::ethereum_types::H256;
 pub type BlockNumber = ethabi::ethereum_types::U64;
 pub type TransactionHash = ethabi::ethereum_types::H256;
 
+#[derive(Clone)]
 pub struct Client {
     api_key: String,
     client: reqwest::Client,
 }
 
 impl Client {
-    fn new(api_key: impl Into<String>) -> Client {
+    pub fn new(api_key: impl Into<String>) -> Client {
         Client {
             api_key: api_key.into(),
             client: reqwest::Client::new(),

@@ -23,7 +23,7 @@ pub struct Client {
 }
 
 impl Client {
-    fn new(api_key: impl Into<String>) -> Client {
+    pub fn new(api_key: impl Into<String>) -> Client {
         Client {
             api_key: api_key.into(),
             client: reqwest::Client::new(),
