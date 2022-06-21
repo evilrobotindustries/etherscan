@@ -1,4 +1,6 @@
 use super::{Result, ACTION, MODULE};
+use crate::Client;
+use async_trait::async_trait;
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr};
 
@@ -7,36 +9,36 @@ mod tests;
 
 const GAS_TRACKER: &str = "gastracker";
 
-pub struct Client {
-    client: super::Client,
-}
-
-impl Client {
-    pub fn new(api_key: impl Into<String>) -> Client {
-        Client {
-            client: super::Client::new(api_key),
-        }
-    }
-
-    pub fn from(client: super::Client) -> Client {
-        Client { client }
-    }
-
+#[async_trait]
+pub trait GasTracker {
     /// Returns the estimated time, in seconds, for a transaction to be confirmed on the blockchain
     ///
     /// # Arguments
     ///
     /// * 'gas_price' - the price paid per unit of gas, in wei
-    pub async fn estimate_time(&self, gas_price: u64) -> Result<u64> {
+    async fn estimate_time(&self, gas_price: u64) -> Result<u64>;
+
+    /// Returns the current Safe, Proposed and Fast gas prices
+    async fn oracle(&self) -> Result<Oracle>;
+}
+
+#[async_trait]
+impl GasTracker for Client {
+    /// Returns the estimated time, in seconds, for a transaction to be confirmed on the blockchain
+    ///
+    /// # Arguments
+    ///
+    /// * 'gas_price' - the price paid per unit of gas, in wei
+    async fn estimate_time(&self, gas_price: u64) -> Result<u64> {
         let parameters = &[(MODULE, GAS_TRACKER), (ACTION, "gasestimate"), ("gasprice", &gas_price.to_string())];
-        let seconds = self.client.get::<String>(parameters).await?;
+        let seconds = self.get::<String>(parameters).await?;
         Ok(seconds.parse::<u64>().unwrap_or(0))
     }
 
     /// Returns the current Safe, Proposed and Fast gas prices
-    pub async fn oracle(&self) -> Result<Oracle> {
+    async fn oracle(&self) -> Result<Oracle> {
         let parameters = &[(MODULE, GAS_TRACKER), (ACTION, "gasoracle")];
-        self.client.get(parameters).await
+        self.get(parameters).await
     }
 }
 

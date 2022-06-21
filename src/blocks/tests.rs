@@ -1,4 +1,5 @@
 use super::Client;
+use crate::blocks::Blocks;
 use crate::blocks::Closest;
 use crate::BlockNumber;
 use chrono::{TimeZone, Utc};

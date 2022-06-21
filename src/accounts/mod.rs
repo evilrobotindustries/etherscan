@@ -1,6 +1,7 @@
 use super::Result;
 use crate::accounts::tokens::TokenOptions;
-use crate::{APIError, Address, BlockNumber, Tag, TransactionHash, TypeExtensions, ACTION, ADDRESS, MODULE, TAG};
+use crate::{APIError, Address, BlockNumber, Client, Tag, TransactionHash, TypeExtensions, ACTION, ADDRESS, MODULE, TAG};
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -25,36 +26,15 @@ const SORT: &str = "sort";
 const START_BLOCK: &str = "startblock";
 const TRANSACTIONS: &str = "txlist";
 
-pub struct Client {
-    client: super::Client,
-}
-
-impl Client {
-    pub fn new(api_key: impl Into<String>) -> Client {
-        Client {
-            client: super::Client::new(api_key),
-        }
-    }
-
-    pub fn from(client: super::Client) -> Client {
-        Client { client }
-    }
-
+#[async_trait]
+pub trait Accounts {
     /// Returns the balance of a given address in wei.
     ///
     /// # Arguments
     ///
     /// * 'address' - An address
     /// * 'tag' - The pre-defined block parameter, which defaults to latest if not provided.
-    pub async fn balance(&self, address: &Address, tag: Option<Tag>) -> Result<u128> {
-        let parameters = &[
-            (MODULE, ACCOUNT),
-            (ACTION, "balance"),
-            (ADDRESS, &TypeExtensions::format(address)),
-            (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
-        ];
-        self.client.get::<String>(parameters).await.map(|v| v.parse::<u128>().unwrap_or(0))
-    }
+    async fn balance(&self, address: &Address, tag: Option<Tag>) -> Result<u128>;
 
     /// Returns the balances for multiple given addresses (max 20).
     ///
@@ -62,7 +42,140 @@ impl Client {
     ///
     /// * 'addresses' - A list of addresses.
     /// * 'tag' - The pre-defined block parameter, which defaults to latest if not provided.
-    pub async fn balances(&self, addresses: Vec<&Address>, tag: Option<Tag>) -> Result<Vec<Balance>> {
+    async fn balances(&self, addresses: Vec<&Address>, tag: Option<Tag>) -> Result<Vec<Balance>>;
+
+    /// Returns the (normal) transactions for a given address (max 10,000).
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address.
+    ///
+    /// **Note:** This API endpoint returns a maximum of 10,000 records only.
+    async fn transactions(&self, address: &Address) -> Result<Vec<Transaction>>;
+
+    /// Returns the (normal) transactions for a given address (max 10,000).
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address.
+    /// * 'options' - Additional options.
+    async fn transactions_with_options(&self, address: &Address, options: TransactionOptions) -> Result<Vec<Transaction>>;
+
+    /// Returns the internal transactions for a given address (max 10,000).
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    ///
+    /// **Note:** This API endpoint returns a maximum of 10,000 records only.
+    async fn internal_transactions(&self, address: &Address) -> Result<Vec<InternalTransaction>>;
+
+    /// Returns the internal transactions performed within a transaction (max 10,000).
+    ///
+    /// # Arguments
+    ///
+    /// * 'hash' - A transaction hash.
+    ///
+    /// **Note:** This API endpoint returns a maximum of 10,000 records only.
+    async fn internal_transactions_for_transaction(&self, hash: &TransactionHash) -> Result<Vec<InternalTransaction>>;
+
+    /// Returns the internal transactions for a given address (max 10,000).
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    /// * 'options' - Additional options.
+    ///
+    /// **Note:** This API endpoint returns a maximum of 10,000 records only.
+    async fn internal_transactions_with_options(&self, address: &Address, options: TransactionOptions) -> Result<Vec<InternalTransaction>>;
+
+    /// Returns the current balance of an ERC-20 token of an address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    /// * 'contract_address' - A contract address
+    async fn erc20_token_balance(&self, address: &Address, contract_address: &Address) -> Result<u128>;
+
+    /// Returns the ERC20 token transfers for a given address and contract address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    /// * 'contract_address' - A contract address
+    async fn erc20_token_transfers(&self, address: &Address, contract_address: &Address) -> Result<Vec<ERC20TokenTransfer>>;
+
+    /// Returns the ERC20 token transfers for a given address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    async fn erc20_token_transfers_by_address(&self, address: &Address) -> Result<Vec<ERC20TokenTransfer>>;
+
+    /// Returns the ERC20 token transfers for a given contract address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'contract_address' - A contract address
+    async fn erc20_token_transfers_by_contract_address(&self, contract_address: &Address) -> Result<Vec<ERC20TokenTransfer>>;
+
+    /// Returns the ERC20 token transfers based on the supplied options.
+    ///
+    /// # Arguments
+    ///
+    /// * 'options' - The token request options.
+    async fn erc20_token_transfers_with_options<'a>(&self, options: TokenOptions<'a>) -> Result<Vec<ERC20TokenTransfer>>;
+
+    /// Returns the ERC721 token transfers for a given address and contract address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    /// * 'contract_address' - A contract address
+    async fn erc721_token_transfers(&self, address: &Address, contract_address: &Address) -> Result<Vec<ERC721TokenTransfer>>;
+
+    /// Returns the ERC721 token transfers for a given address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    async fn erc721_token_transfers_by_address(&self, address: &Address) -> Result<Vec<ERC721TokenTransfer>>;
+
+    /// Returns the ERC721 token transfers for a given contract address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'contract_address' - A contract address
+    async fn erc721_token_transfers_by_contract_address(&self, contract_address: &Address) -> Result<Vec<ERC721TokenTransfer>>;
+
+    /// Returns the ERC721 token transfers based on the supplied options.
+    ///
+    /// # Arguments
+    ///
+    /// * 'options' - The token request options.
+    async fn erc721_token_transfers_with_options<'a>(&self, options: TokenOptions<'a>) -> Result<Vec<ERC721TokenTransfer>>;
+
+    /// Returns a list of blocks mined by an address.
+    ///
+    /// # Arguments
+    ///
+    /// * 'address' - An address
+    async fn blocks_mined(&self, address: &Address, block_type: BlockType, page: Page) -> Result<Vec<Block>>;
+}
+
+#[async_trait]
+impl Accounts for Client {
+    async fn balance(&self, address: &Address, tag: Option<Tag>) -> Result<u128> {
+        let parameters = &[
+            (MODULE, ACCOUNT),
+            (ACTION, "balance"),
+            (ADDRESS, &TypeExtensions::format(address)),
+            (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
+        ];
+        self.get::<String>(parameters).await.map(|v| v.parse::<u128>().unwrap_or(0))
+    }
+
+    async fn balances(&self, addresses: Vec<&Address>, tag: Option<Tag>) -> Result<Vec<Balance>> {
         if addresses.len() > 20 {
             return Err(APIError::TooManyAddresses);
         }
@@ -80,216 +193,123 @@ impl Client {
             (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
         ];
 
-        self.client.get::<Vec<Balance>>(parameters).await
+        self.get::<Vec<Balance>>(parameters).await
     }
 
-    /// Returns the (normal) transactions for a given address (max 10,000).
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address.
-    ///
-    /// **Note:** This API endpoint returns a maximum of 10,000 records only.
-    pub async fn transactions(&self, address: &Address) -> Result<Vec<Transaction>> {
-        self.client
-            .get::<Vec<Transaction>>(&[
-                (MODULE, ACCOUNT),
-                (ACTION, TRANSACTIONS),
-                (ADDRESS, &TypeExtensions::format(address)),
-            ])
-            .await
+    async fn transactions(&self, address: &Address) -> Result<Vec<Transaction>> {
+        self.get::<Vec<Transaction>>(&[
+            (MODULE, ACCOUNT),
+            (ACTION, TRANSACTIONS),
+            (ADDRESS, &TypeExtensions::format(address)),
+        ])
+        .await
     }
 
-    /// Returns the (normal) transactions for a given address (max 10,000).
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address.
-    /// * 'options' - Additional options.
-    pub async fn transactions_with_options(&self, address: &Address, options: TransactionOptions) -> Result<Vec<Transaction>> {
+    async fn transactions_with_options(&self, address: &Address, options: TransactionOptions) -> Result<Vec<Transaction>> {
         self.get_transactions_with_options::<Transaction>(TRANSACTIONS, address, options)
             .await
     }
 
-    /// Returns the internal transactions for a given address (max 10,000).
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address
-    ///
-    /// **Note:** This API endpoint returns a maximum of 10,000 records only.
-    pub async fn internal_transactions(&self, address: &Address) -> Result<Vec<InternalTransaction>> {
+    async fn internal_transactions(&self, address: &Address) -> Result<Vec<InternalTransaction>> {
         let parameters = &[
             (MODULE, ACCOUNT),
             (ACTION, INTERNAL_TRANSACTIONS),
             (ADDRESS, &TypeExtensions::format(address)),
         ];
-        self.client.get::<Vec<InternalTransaction>>(parameters).await
+        self.get::<Vec<InternalTransaction>>(parameters).await
     }
 
-    /// Returns the internal transactions performed within a transaction (max 10,000).
-    ///
-    /// # Arguments
-    ///
-    /// * 'hash' - A transaction hash.
-    ///
-    /// **Note:** This API endpoint returns a maximum of 10,000 records only.
-    pub async fn internal_transactions_for_transaction(&self, hash: &TransactionHash) -> Result<Vec<InternalTransaction>> {
+    async fn internal_transactions_for_transaction(&self, hash: &TransactionHash) -> Result<Vec<InternalTransaction>> {
         let parameters = &[
             (MODULE, ACCOUNT),
             (ACTION, INTERNAL_TRANSACTIONS),
             ("txhash", &TypeExtensions::format(hash)),
         ];
-        self.client.get::<Vec<InternalTransaction>>(parameters).await
+        self.get::<Vec<InternalTransaction>>(parameters).await
     }
 
-    /// Returns the internal transactions for a given address (max 10,000).
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address
-    /// * 'options' - Additional options.
-    ///
-    /// **Note:** This API endpoint returns a maximum of 10,000 records only.
-    pub async fn internal_transactions_with_options(
-        &self,
-        address: &Address,
-        options: TransactionOptions,
-    ) -> Result<Vec<InternalTransaction>> {
+    async fn internal_transactions_with_options(&self, address: &Address, options: TransactionOptions) -> Result<Vec<InternalTransaction>> {
         self.get_transactions_with_options::<InternalTransaction>(INTERNAL_TRANSACTIONS, address, options)
             .await
     }
 
-    /// Returns the current balance of an ERC-20 token of an address.
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address
-    /// * 'contract_address' - A contract address
-    pub async fn erc20_token_balance(&self, address: &Address, contract_address: &Address) -> Result<u128> {
+    async fn erc20_token_balance(&self, address: &Address, contract_address: &Address) -> Result<u128> {
         let parameters = &[
             (MODULE, ACCOUNT),
             (ACTION, "tokenbalance"),
             (ADDRESS, &TypeExtensions::format(address)),
             (CONTRACT_ADDRESS, &TypeExtensions::format(contract_address)),
         ];
-        self.client.get::<String>(parameters).await.map(|v| v.parse::<u128>().unwrap_or(0))
+        self.get::<String>(parameters).await.map(|v| v.parse::<u128>().unwrap_or(0))
     }
 
-    /// Returns the ERC20 token transfers for a given address and contract address.
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address
-    /// * 'contract_address' - A contract address
-    pub async fn erc20_token_transfers(&self, address: &Address, contract_address: &Address) -> Result<Vec<ERC20TokenTransfer>> {
+    async fn erc20_token_transfers(&self, address: &Address, contract_address: &Address) -> Result<Vec<ERC20TokenTransfer>> {
         let parameters = &[
             (MODULE, ACCOUNT),
             (ACTION, ERC20_TOKEN_TRANSFERS),
             (ADDRESS, &TypeExtensions::format(address)),
             (CONTRACT_ADDRESS, &TypeExtensions::format(contract_address)),
         ];
-        self.client.get::<Vec<ERC20TokenTransfer>>(parameters).await
+        self.get::<Vec<ERC20TokenTransfer>>(parameters).await
     }
 
-    /// Returns the ERC20 token transfers for a given address.
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address
-    pub async fn erc20_token_transfers_by_address(&self, address: &Address) -> Result<Vec<ERC20TokenTransfer>> {
+    async fn erc20_token_transfers_by_address(&self, address: &Address) -> Result<Vec<ERC20TokenTransfer>> {
         let parameters = &[
             (MODULE, ACCOUNT),
             (ACTION, ERC20_TOKEN_TRANSFERS),
             (ADDRESS, &TypeExtensions::format(address)),
         ];
-        self.client.get::<Vec<ERC20TokenTransfer>>(parameters).await
+        self.get::<Vec<ERC20TokenTransfer>>(parameters).await
     }
 
-    /// Returns the ERC20 token transfers for a given contract address.
-    ///
-    /// # Arguments
-    ///
-    /// * 'contract_address' - A contract address
-    pub async fn erc20_token_transfers_by_contract_address(&self, contract_address: &Address) -> Result<Vec<ERC20TokenTransfer>> {
+    async fn erc20_token_transfers_by_contract_address(&self, contract_address: &Address) -> Result<Vec<ERC20TokenTransfer>> {
         let parameters = &[
             (MODULE, ACCOUNT),
             (ACTION, ERC20_TOKEN_TRANSFERS),
             (CONTRACT_ADDRESS, &TypeExtensions::format(contract_address)),
         ];
-        self.client.get::<Vec<ERC20TokenTransfer>>(parameters).await
+        self.get::<Vec<ERC20TokenTransfer>>(parameters).await
     }
 
-    /// Returns the ERC20 token transfers based on the supplied options.
-    ///
-    /// # Arguments
-    ///
-    /// * 'options' - The token request options.
-    pub async fn erc20_token_transfers_with_options<'a>(&self, options: TokenOptions<'a>) -> Result<Vec<ERC20TokenTransfer>> {
+    async fn erc20_token_transfers_with_options<'a>(&self, options: TokenOptions<'a>) -> Result<Vec<ERC20TokenTransfer>> {
         self.get_tokens_with_options::<ERC20TokenTransfer>(ERC20_TOKEN_TRANSFERS, options)
             .await
     }
 
-    /// Returns the ERC721 token transfers for a given address and contract address.
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address
-    /// * 'contract_address' - A contract address
-    pub async fn erc721_token_transfers(&self, address: &Address, contract_address: &Address) -> Result<Vec<ERC721TokenTransfer>> {
+    async fn erc721_token_transfers(&self, address: &Address, contract_address: &Address) -> Result<Vec<ERC721TokenTransfer>> {
         let parameters = &[
             (MODULE, ACCOUNT),
             (ACTION, ERC721_TOKEN_TRANSFERS),
             (ADDRESS, &TypeExtensions::format(address)),
             (CONTRACT_ADDRESS, &TypeExtensions::format(contract_address)),
         ];
-        self.client.get::<Vec<ERC721TokenTransfer>>(parameters).await
+        self.get::<Vec<ERC721TokenTransfer>>(parameters).await
     }
 
-    /// Returns the ERC721 token transfers for a given address.
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address
-    pub async fn erc721_token_transfers_by_address(&self, address: &Address) -> Result<Vec<ERC721TokenTransfer>> {
+    async fn erc721_token_transfers_by_address(&self, address: &Address) -> Result<Vec<ERC721TokenTransfer>> {
         let parameters = &[
             (MODULE, ACCOUNT),
             (ACTION, ERC721_TOKEN_TRANSFERS),
             (ADDRESS, &TypeExtensions::format(address)),
         ];
-        self.client.get::<Vec<ERC721TokenTransfer>>(parameters).await
+        self.get::<Vec<ERC721TokenTransfer>>(parameters).await
     }
 
-    /// Returns the ERC721 token transfers for a given contract address.
-    ///
-    /// # Arguments
-    ///
-    /// * 'contract_address' - A contract address
-    pub async fn erc721_token_transfers_by_contract_address(&self, contract_address: &Address) -> Result<Vec<ERC721TokenTransfer>> {
+    async fn erc721_token_transfers_by_contract_address(&self, contract_address: &Address) -> Result<Vec<ERC721TokenTransfer>> {
         let parameters = &[
             (MODULE, ACCOUNT),
             (ACTION, ERC721_TOKEN_TRANSFERS),
             (CONTRACT_ADDRESS, &TypeExtensions::format(contract_address)),
         ];
-        self.client.get::<Vec<ERC721TokenTransfer>>(parameters).await
+        self.get::<Vec<ERC721TokenTransfer>>(parameters).await
     }
 
-    /// Returns the ERC721 token transfers based on the supplied options.
-    ///
-    /// # Arguments
-    ///
-    /// * 'options' - The token request options.
-    pub async fn erc721_token_transfers_with_options<'a>(&self, options: TokenOptions<'a>) -> Result<Vec<ERC721TokenTransfer>> {
+    async fn erc721_token_transfers_with_options<'a>(&self, options: TokenOptions<'a>) -> Result<Vec<ERC721TokenTransfer>> {
         self.get_tokens_with_options::<ERC721TokenTransfer>(ERC721_TOKEN_TRANSFERS, options)
             .await
     }
 
-    /// Returns a list of blocks mined by an address.
-    ///
-    /// # Arguments
-    ///
-    /// * 'address' - An address
-    pub async fn blocks_mined(&self, address: &Address, block_type: BlockType, page: Page) -> Result<Vec<Block>> {
+    async fn blocks_mined(&self, address: &Address, block_type: BlockType, page: Page) -> Result<Vec<Block>> {
         let block_type = block_type.to_string();
         let page = page.to_string();
         let parameters = &[
@@ -300,9 +320,11 @@ impl Client {
             (PAGE, &page.0),
             (OFFSET, &page.1),
         ];
-        self.client.get::<Vec<Block>>(parameters).await
+        self.get::<Vec<Block>>(parameters).await
     }
+}
 
+impl Client {
     async fn get_transactions_with_options<T: DeserializeOwned>(
         &self,
         action: &str,
@@ -341,7 +363,7 @@ impl Client {
             parameters.push((SORT, &parameter))
         }
 
-        self.client.get::<Vec<T>>(&parameters).await
+        self.get::<Vec<T>>(&parameters).await
     }
 
     async fn get_tokens_with_options<'a, T: DeserializeOwned>(&self, action: &str, options: TokenOptions<'a>) -> Result<Vec<T>> {
@@ -386,7 +408,7 @@ impl Client {
             parameters.push((SORT, &parameter))
         }
 
-        self.client.get::<Vec<T>>(&parameters).await
+        self.get::<Vec<T>>(&parameters).await
     }
 }
 
@@ -437,6 +459,7 @@ pub enum Sort {
 }
 
 impl Page {
+    #![allow(dead_code)]
     fn new(number: u8, offset: u16) -> Page {
         Page { number, offset }
     }

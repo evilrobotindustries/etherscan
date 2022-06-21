@@ -1,4 +1,5 @@
 use super::Client;
+use crate::accounts::Accounts;
 use crate::accounts::{transactions::TransactionOptions, BlockType, Page, Sort};
 use crate::{convert, Address, BlockNumber, TransactionHash};
 use once_cell::sync::Lazy;

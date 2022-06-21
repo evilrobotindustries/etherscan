@@ -1,4 +1,5 @@
 use super::Client;
+use crate::gas_tracker::GasTracker;
 use once_cell::sync::Lazy;
 
 const API_KEY: &str = "";

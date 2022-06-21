@@ -1,5 +1,6 @@
 use super::Result;
-use crate::{BlockNumber, TypeExtensions, ACTION, MODULE};
+use crate::{BlockNumber, Client, TypeExtensions, ACTION, MODULE};
+use async_trait::async_trait;
 use chrono::{Date, DateTime, NaiveDate, Utc};
 use ethabi::Address;
 use serde::de::Error;
@@ -11,21 +12,8 @@ mod tests;
 
 const STATS: &str = "stats";
 
-pub struct Client {
-    client: super::Client,
-}
-
-impl Client {
-    pub fn new(api_key: impl Into<String>) -> Client {
-        Client {
-            client: super::Client::new(api_key),
-        }
-    }
-
-    pub fn from(client: super::Client) -> Client {
-        Client { client }
-    }
-
+#[async_trait]
+pub trait Stats {
     /// Returns the size of the Ethereum blockchain, in bytes, over a date range
     ///
     /// # Arguments
@@ -35,7 +23,38 @@ impl Client {
     /// * 'client_type' - the Ethereum node client to use
     /// * 'sync_mode' - the type of node to run
     /// * 'sort' - the sorting preference
-    pub async fn chain_size(
+    async fn chain_size(
+        &self,
+        start_date: NaiveDate,
+        end_date: NaiveDate,
+        client_type: ClientType,
+        sync_mode: SyncMode,
+        sort: Sort,
+    ) -> Result<Vec<ChainSize>>;
+
+    /// Returns the latest price of 1 ETH
+    async fn last_price(&self) -> Result<Price>;
+
+    /// Returns the total number of discoverable Ethereum nodes.
+    async fn nodes(&self) -> Result<NodeStats>;
+
+    /// Returns the current amount of an ERC-20 token in circulation.
+    ///
+    /// # Arguments
+    ///
+    /// * 'contract_address' - the contract address of the ERC-20 token
+    async fn token_supply(&self, contract_address: &Address) -> Result<u128>;
+
+    /// Returns the current amount of Ether in circulation excluding ETH2 Staking rewards and EIP1559 burnt fees
+    async fn total_supply(&self) -> Result<u128>;
+
+    /// Returns the current amount of Ether in circulation, ETH2 Staking rewards and EIP1559 burnt fees statistics.
+    async fn total_supply_stats(&self) -> Result<TotalSupply>;
+}
+
+#[async_trait]
+impl Stats for Client {
+    async fn chain_size(
         &self,
         start_date: NaiveDate,
         end_date: NaiveDate,
@@ -53,45 +72,37 @@ impl Client {
             ("syncmode", sync_mode.to_string()),
             ("sort", sort.to_string()),
         ];
-        self.client.get(parameters).await
+        self.get(parameters).await
     }
 
-    /// Returns the latest price of 1 ETH
-    pub async fn last_price(&self) -> Result<Price> {
+    async fn last_price(&self) -> Result<Price> {
         let parameters = &[(MODULE, STATS), (ACTION, "ethprice")];
-        self.client.get(parameters).await
+        self.get(parameters).await
     }
 
-    /// Returns the total number of discoverable Ethereum nodes.
-    pub async fn nodes(&self) -> Result<NodeStats> {
+    async fn nodes(&self) -> Result<NodeStats> {
         let parameters = &[(MODULE, STATS), (ACTION, "nodecount")];
-        self.client.get(parameters).await
+        self.get(parameters).await
     }
 
-    /// Returns the current amount of an ERC-20 token in circulation.
-    ///
-    /// # Arguments
-    ///
-    /// * 'contract_address' - the contract address of the ERC-20 token
-    pub async fn token_supply(&self, contract_address: &Address) -> Result<u128> {
+    async fn token_supply(&self, contract_address: &Address) -> Result<u128> {
         let parameters = &[
             (MODULE, STATS),
             (ACTION, "tokensupply"),
             ("contractaddress", &TypeExtensions::format(contract_address)),
         ];
-        self.client.get::<String>(parameters).await.map(|v| v.parse::<u128>().unwrap_or(0))
+        self.get::<String>(parameters).await.map(|v| v.parse::<u128>().unwrap_or(0))
     }
 
-    /// Returns the current amount of Ether in circulation excluding ETH2 Staking rewards and EIP1559 burnt fees
-    pub async fn total_supply(&self) -> Result<u128> {
+    async fn total_supply(&self) -> Result<u128> {
         let parameters = &[(MODULE, STATS), (ACTION, "ethsupply")];
-        self.client.get::<String>(parameters).await.map(|v| v.parse::<u128>().unwrap_or(0))
+        self.get::<String>(parameters).await.map(|v| v.parse::<u128>().unwrap_or(0))
     }
 
     /// Returns the current amount of Ether in circulation, ETH2 Staking rewards and EIP1559 burnt fees statistics.
-    pub async fn total_supply_stats(&self) -> Result<TotalSupply> {
+    async fn total_supply_stats(&self) -> Result<TotalSupply> {
         let parameters = &[(MODULE, STATS), (ACTION, "ethsupply2")];
-        self.client.get(parameters).await
+        self.get(parameters).await
     }
 }
 

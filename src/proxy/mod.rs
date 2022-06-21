@@ -1,7 +1,10 @@
 use crate::responses::ResponseStatus;
-use crate::{APIError, Address, BlockHash, BlockNumber, RPCError, Result, TransactionHash, TypeExtensions, ACTION, ADDRESS, MODULE, URI};
+use crate::{
+    APIError, Address, BlockHash, BlockNumber, Client, RPCError, Result, TransactionHash, TypeExtensions, ACTION, ADDRESS, MODULE, URI,
+};
 use crate::{Tag, TAG};
-use ethabi::ethereum_types::{U128, U64};
+use async_trait::async_trait;
+use ethabi::ethereum_types::U64;
 use serde::de::DeserializeOwned;
 use serde::{
     de,
@@ -17,53 +20,24 @@ mod tests;
 
 const PROXY: &str = "proxy";
 
-pub struct Client {
-    api_key: String,
-    client: reqwest::Client,
-}
-
-impl Client {
-    pub fn new(api_key: impl Into<String>) -> Client {
-        Client {
-            api_key: api_key.into(),
-            client: reqwest::Client::new(),
-        }
-    }
-
+#[async_trait]
+pub trait Proxy {
     /// Returns the number of most recent block
-    pub async fn block_number(&self) -> Result<BlockNumber> {
-        let parameters = &[(MODULE, PROXY), (ACTION, "eth_blockNumber")];
-        self.get(parameters).await
-    }
+    async fn block_number(&self) -> Result<BlockNumber>;
 
     /// Returns information about a block by block number
     ///
     /// # Arguments
     ///
     /// * 'block_number' - The block number
-    pub async fn block(&self, block_number: &BlockNumber) -> Result<Block> {
-        let parameters = &[
-            (MODULE, PROXY),
-            (ACTION, "eth_getBlockByNumber"),
-            ("tag", &TypeExtensions::format(block_number)),
-            ("boolean", &false.to_string()),
-        ];
-        self.get(parameters).await
-    }
+    async fn block(&self, block_number: &BlockNumber) -> Result<Block>;
 
     /// Returns the number of transactions in a block
     ///
     /// # Arguments
     ///
     /// * 'block_number' - The block number
-    pub async fn block_transactions(&self, block_number: &BlockNumber) -> Result<u64> {
-        let parameters = &[
-            (MODULE, PROXY),
-            (ACTION, "eth_getBlockTransactionCountByNumber"),
-            (TAG, &TypeExtensions::format(block_number)),
-        ];
-        self.get::<U64>(parameters).await.map(|t| t.as_u64())
-    }
+    async fn block_transactions(&self, block_number: &BlockNumber) -> Result<u64>;
 
     /// Executes a new message call immediately without creating a transaction on the block chain
     ///
@@ -72,16 +46,7 @@ impl Client {
     /// * 'contract_address' - The contract address to interact with
     /// * 'data' - The hash of the method signature and encoded parameters
     /// * 'tag' - The pre-defined block parameter, which defaults to latest if not provided.
-    pub async fn call(&self, contract_address: &Address, data: &str, tag: Option<Tag>) -> Result<String> {
-        let parameters = &[
-            (MODULE, PROXY),
-            (ACTION, "eth_call"),
-            ("to", &TypeExtensions::format(contract_address)),
-            ("data", data),
-            (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
-        ];
-        self.get(parameters).await
-    }
+    async fn call(&self, contract_address: &Address, data: &str, tag: Option<Tag>) -> Result<String>;
 
     /// Returns code at a given address
     ///
@@ -89,15 +54,7 @@ impl Client {
     ///
     /// * 'address' - The address to get code
     /// * 'tag' - The pre-defined block parameter
-    pub async fn code(&self, address: &Address, tag: Option<Tag>) -> Result<String> {
-        let parameters = &[
-            (MODULE, PROXY),
-            (ACTION, "eth_getCode"),
-            (ADDRESS, &TypeExtensions::format(address)),
-            (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
-        ];
-        self.get(parameters).await
-    }
+    async fn code(&self, address: &Address, tag: Option<Tag>) -> Result<String>;
 
     /// Makes a call or transaction, which won't be added to the blockchain, but returns the used gas
     ///
@@ -110,34 +67,17 @@ impl Client {
     /// * 'gas_price' - the gas price paid for each unit of gas, in wei
     ///
     /// **Note:** The gas parameter is capped at 2x the current block gas limit.
-    pub async fn estimate_gas(&self, contract_address: &Address, data: &str, value: u64, gas: u64, gas_price: u64) -> Result<u64> {
-        let parameters = &[
-            (MODULE, PROXY),
-            (ACTION, "eth_estimateGas"),
-            ("to", &TypeExtensions::format(contract_address)),
-            ("data", data),
-            ("value", &TypeExtensions::format(&value)),
-            ("gas", &TypeExtensions::format(&gas)),
-            ("gasPrice", &TypeExtensions::format(&gas_price)),
-        ];
-        self.get::<U64>(parameters).await.map(|t| t.as_u64())
-    }
+    async fn estimate_gas(&self, contract_address: &Address, data: &str, value: u64, gas: u64, gas_price: u64) -> Result<u64>;
 
     /// Returns the current price per gas in wei
-    pub async fn gas_price(&self) -> Result<u64> {
-        let parameters = &[(MODULE, PROXY), (ACTION, "eth_gasPrice")];
-        self.get::<U64>(parameters).await.map(|t| t.as_u64())
-    }
+    async fn gas_price(&self) -> Result<u64>;
 
     /// Submits a pre-signed transaction for broadcast to the Ethereum network
     ///
     /// # Arguments
     ///
     /// * 'transaction' - the signed raw transaction data to broadcast
-    pub async fn send_transaction(&self, transaction: String) -> Result<TransactionHash> {
-        let parameters = &[(MODULE, PROXY), (ACTION, "eth_sendRawTransaction"), ("hex", &transaction)];
-        self.get(parameters).await
-    }
+    async fn send_transaction(&self, transaction: String) -> Result<TransactionHash>;
 
     /// Returns the value from a storage position at a given address.
     ///
@@ -148,44 +88,21 @@ impl Client {
     /// * 'tag' - The pre-defined block parameter
     ///
     /// **Note:** This endpoint is still experimental and may have potential issues
-    pub async fn storage_value(&self, address: &Address, position: u16, tag: Option<Tag>) -> Result<String> {
-        let parameters = &[
-            (MODULE, PROXY),
-            (ACTION, "eth_getStorageAt"),
-            (ADDRESS, &TypeExtensions::format(address)),
-            ("position", &TypeExtensions::format(&position)),
-            (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
-        ];
-        self.get(parameters).await
-    }
+    async fn storage_value(&self, address: &Address, position: u16, tag: Option<Tag>) -> Result<String>;
 
     /// Returns the information about a transaction requested by transaction hash
     ///
     /// # Arguments
     ///
     /// * 'hash' - The hash of the transaction
-    pub async fn transaction(&self, hash: &TransactionHash) -> Result<Option<Transaction>> {
-        let parameters = &[
-            (MODULE, PROXY),
-            (ACTION, "eth_getTransactionByHash"),
-            ("txhash", &TypeExtensions::format(hash)),
-        ];
-        self.get(parameters).await
-    }
+    async fn transaction(&self, hash: &TransactionHash) -> Result<Option<Transaction>>;
 
     /// Returns the receipt of a transaction by transaction hash
     ///
     /// # Arguments
     ///
     /// * 'hash' - The hash of the transaction
-    pub async fn transaction_receipt(&self, hash: &TransactionHash) -> Result<Option<TransactionReceipt>> {
-        let parameters = &[
-            (MODULE, PROXY),
-            (ACTION, "eth_getTransactionReceipt"),
-            ("txhash", &TypeExtensions::format(hash)),
-        ];
-        self.get(parameters).await
-    }
+    async fn transaction_receipt(&self, hash: &TransactionHash) -> Result<Option<TransactionReceipt>>;
 
     /// Returns information about a transaction by block number and transaction index position.
     ///
@@ -193,15 +110,7 @@ impl Client {
     ///
     /// * 'block_number' - The block number
     /// * 'index' - the position of the transaction's index in the block
-    pub async fn transaction_within_block(&self, block_number: BlockNumber, index: u16) -> Result<Option<Transaction>> {
-        let parameters = &[
-            (MODULE, PROXY),
-            (ACTION, "eth_getTransactionByBlockNumberAndIndex"),
-            (TAG, &TypeExtensions::format(&block_number)),
-            ("index", &TypeExtensions::format(&index)),
-        ];
-        self.get(parameters).await
-    }
+    async fn transaction_within_block(&self, block_number: BlockNumber, index: u16) -> Result<Option<Transaction>>;
 
     /// Returns the number of outgoing transactions sent by an address
     ///
@@ -209,15 +118,7 @@ impl Client {
     ///
     /// * 'address' - The address to get the number of transactions performed
     /// * 'tag' - The pre-defined block parameter, which defaults to latest if not provided.
-    pub async fn transactions(&self, address: &Address, tag: Option<Tag>) -> Result<u64> {
-        let parameters = &[
-            (MODULE, PROXY),
-            (ACTION, "eth_getTransactionCount"),
-            (ADDRESS, &TypeExtensions::format(address)),
-            (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
-        ];
-        self.get::<U64>(parameters).await.map(|t| t.as_u64())
-    }
+    async fn transactions(&self, address: &Address, tag: Option<Tag>) -> Result<u64>;
 
     /// Returns information about a uncle by block number.
     ///
@@ -225,17 +126,141 @@ impl Client {
     ///
     /// * 'block_number' - The block number
     /// * 'index' - the position of the uncle's index in the block
-    pub async fn uncle(&self, block_number: BlockNumber, index: u16) -> Result<Block> {
+    async fn uncle(&self, block_number: BlockNumber, index: u16) -> Result<Block>;
+}
+
+#[async_trait]
+impl Proxy for Client {
+    async fn block_number(&self) -> Result<BlockNumber> {
+        let parameters = &[(MODULE, PROXY), (ACTION, "eth_blockNumber")];
+        self.get_json_rpc(parameters).await
+    }
+
+    async fn block(&self, block_number: &BlockNumber) -> Result<Block> {
+        let parameters = &[
+            (MODULE, PROXY),
+            (ACTION, "eth_getBlockByNumber"),
+            ("tag", &TypeExtensions::format(block_number)),
+            ("boolean", &false.to_string()),
+        ];
+        self.get_json_rpc(parameters).await
+    }
+
+    async fn block_transactions(&self, block_number: &BlockNumber) -> Result<u64> {
+        let parameters = &[
+            (MODULE, PROXY),
+            (ACTION, "eth_getBlockTransactionCountByNumber"),
+            (TAG, &TypeExtensions::format(block_number)),
+        ];
+        self.get_json_rpc::<U64>(parameters).await.map(|t| t.as_u64())
+    }
+
+    async fn call(&self, contract_address: &Address, data: &str, tag: Option<Tag>) -> Result<String> {
+        let parameters = &[
+            (MODULE, PROXY),
+            (ACTION, "eth_call"),
+            ("to", &TypeExtensions::format(contract_address)),
+            ("data", data),
+            (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
+        ];
+        self.get_json_rpc(parameters).await
+    }
+
+    async fn code(&self, address: &Address, tag: Option<Tag>) -> Result<String> {
+        let parameters = &[
+            (MODULE, PROXY),
+            (ACTION, "eth_getCode"),
+            (ADDRESS, &TypeExtensions::format(address)),
+            (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
+        ];
+        self.get_json_rpc(parameters).await
+    }
+
+    async fn estimate_gas(&self, contract_address: &Address, data: &str, value: u64, gas: u64, gas_price: u64) -> Result<u64> {
+        let parameters = &[
+            (MODULE, PROXY),
+            (ACTION, "eth_estimateGas"),
+            ("to", &TypeExtensions::format(contract_address)),
+            ("data", data),
+            ("value", &TypeExtensions::format(&value)),
+            ("gas", &TypeExtensions::format(&gas)),
+            ("gasPrice", &TypeExtensions::format(&gas_price)),
+        ];
+        self.get_json_rpc::<U64>(parameters).await.map(|t| t.as_u64())
+    }
+
+    async fn gas_price(&self) -> Result<u64> {
+        let parameters = &[(MODULE, PROXY), (ACTION, "eth_gasPrice")];
+        self.get_json_rpc::<U64>(parameters).await.map(|t| t.as_u64())
+    }
+
+    async fn send_transaction(&self, transaction: String) -> Result<TransactionHash> {
+        let parameters = &[(MODULE, PROXY), (ACTION, "eth_sendRawTransaction"), ("hex", &transaction)];
+        self.get_json_rpc(parameters).await
+    }
+
+    async fn storage_value(&self, address: &Address, position: u16, tag: Option<Tag>) -> Result<String> {
+        let parameters = &[
+            (MODULE, PROXY),
+            (ACTION, "eth_getStorageAt"),
+            (ADDRESS, &TypeExtensions::format(address)),
+            ("position", &TypeExtensions::format(&position)),
+            (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
+        ];
+        self.get_json_rpc(parameters).await
+    }
+
+    async fn transaction(&self, hash: &TransactionHash) -> Result<Option<Transaction>> {
+        let parameters = &[
+            (MODULE, PROXY),
+            (ACTION, "eth_getTransactionByHash"),
+            ("txhash", &TypeExtensions::format(hash)),
+        ];
+        self.get_json_rpc(parameters).await
+    }
+
+    async fn transaction_receipt(&self, hash: &TransactionHash) -> Result<Option<TransactionReceipt>> {
+        let parameters = &[
+            (MODULE, PROXY),
+            (ACTION, "eth_getTransactionReceipt"),
+            ("txhash", &TypeExtensions::format(hash)),
+        ];
+        self.get_json_rpc(parameters).await
+    }
+
+    async fn transaction_within_block(&self, block_number: BlockNumber, index: u16) -> Result<Option<Transaction>> {
+        let parameters = &[
+            (MODULE, PROXY),
+            (ACTION, "eth_getTransactionByBlockNumberAndIndex"),
+            (TAG, &TypeExtensions::format(&block_number)),
+            ("index", &TypeExtensions::format(&index)),
+        ];
+        self.get_json_rpc(parameters).await
+    }
+
+    async fn transactions(&self, address: &Address, tag: Option<Tag>) -> Result<u64> {
+        let parameters = &[
+            (MODULE, PROXY),
+            (ACTION, "eth_getTransactionCount"),
+            (ADDRESS, &TypeExtensions::format(address)),
+            (TAG, tag.or(Some(Tag::Latest)).unwrap().to_string()),
+        ];
+        self.get_json_rpc::<U64>(parameters).await.map(|t| t.as_u64())
+    }
+
+    async fn uncle(&self, block_number: BlockNumber, index: u16) -> Result<Block> {
         let parameters = &[
             (MODULE, PROXY),
             (ACTION, "eth_getUncleByBlockNumberAndIndex"),
             (TAG, &TypeExtensions::format(&block_number)),
             ("index", &TypeExtensions::format(&index)),
         ];
-        self.get(parameters).await
+        self.get_json_rpc(parameters).await
     }
+}
 
-    async fn get<'de, T: DeserializeOwned>(&self, parameters: &[(&str, &str)]) -> Result<T> {
+impl Client {
+    async fn get_json_rpc<'de, T: DeserializeOwned>(&self, parameters: &[(&str, &str)]) -> Result<T> {
         self.client
             .get(URI)
             .query(&[("apikey", &self.api_key)])
@@ -508,9 +533,9 @@ fn de_hash_to_u16<'a, D: Deserializer<'a>>(deserializer: D) -> std::result::Resu
     U64::deserialize(deserializer).map(|v| v.as_u32() as u16)
 }
 
-fn de_hash_to_u32<'a, D: Deserializer<'a>>(deserializer: D) -> std::result::Result<u32, D::Error> {
-    U64::deserialize(deserializer).map(|v| v.as_u32())
-}
+// fn de_hash_to_u32<'a, D: Deserializer<'a>>(deserializer: D) -> std::result::Result<u32, D::Error> {
+//     U64::deserialize(deserializer).map(|v| v.as_u32())
+// }
 
 fn de_hash_to_optional_u32<'a, D: Deserializer<'a>>(deserializer: D) -> std::result::Result<Option<u32>, D::Error> {
     U64::deserialize(deserializer).map(|v| Some(v.as_u32()))
@@ -520,6 +545,6 @@ fn de_hash_to_u64<'a, D: Deserializer<'a>>(deserializer: D) -> std::result::Resu
     U64::deserialize(deserializer).map(|v| v.as_u64())
 }
 
-fn de_hash_to_u128<'a, D: Deserializer<'a>>(deserializer: D) -> std::result::Result<u128, D::Error> {
-    U128::deserialize(deserializer).map(|v| v.as_u128())
-}
+// fn de_hash_to_u128<'a, D: Deserializer<'a>>(deserializer: D) -> std::result::Result<u128, D::Error> {
+//     U128::deserialize(deserializer).map(|v| v.as_u128())
+// }

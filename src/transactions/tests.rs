@@ -1,4 +1,5 @@
 use super::Client;
+use crate::transactions::Transactions;
 use crate::TransactionHash;
 use once_cell::sync::Lazy;
 use std::str::FromStr;

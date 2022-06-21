@@ -1,4 +1,5 @@
 use super::Client;
+use crate::contracts::Contracts;
 use crate::Address;
 use once_cell::sync::Lazy;
 use std::str::FromStr;

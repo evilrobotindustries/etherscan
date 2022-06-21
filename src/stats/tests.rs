@@ -1,4 +1,5 @@
 use super::Client;
+use crate::stats::Stats;
 use crate::stats::{ClientType, Sort, SyncMode};
 use crate::{Address, BlockNumber};
 use chrono::{Duration, NaiveDate, Utc};

@@ -1,4 +1,5 @@
 use super::Client;
+use crate::proxy::Proxy;
 use crate::{Address, BlockNumber, Tag, TransactionHash};
 use once_cell::sync::Lazy;
 use std::str::FromStr;
@@ -135,7 +136,7 @@ async fn transaction_within_block() -> Result<(), crate::APIError> {
 async fn transactions() -> Result<(), crate::APIError> {
     let address = Address::from_str("0x4bd5900Cb274ef15b153066D736bf3e83A9ba44e").expect("could not parse address");
     let transactions = CLIENT.transactions(&address, Some(Tag::Latest)).await?;
-    assert_eq!(112, transactions);
+    assert_eq!(113, transactions);
     println!("Transactions for {address} is {transactions}");
     Ok(())
 }

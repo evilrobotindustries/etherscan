@@ -1,8 +1,9 @@
 use super::{BoolFromStr, Result, ACTION, MODULE};
-use crate::{APIError, TypeExtensions, ADDRESS};
+use crate::{APIError, Client, TypeExtensions, ADDRESS};
+use async_trait::async_trait;
 use ethabi::Address;
 use serde::de::Error;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::str;
 
@@ -13,49 +14,43 @@ const CONTRACT: &str = "contract";
 
 pub type ABI = ethabi::Contract;
 
-pub struct Client {
-    client: super::Client,
-}
-
-impl Client {
-    pub fn new(api_key: impl Into<String>) -> Client {
-        Client {
-            client: super::Client::new(api_key),
-        }
-    }
-
-    pub fn from(client: super::Client) -> Client {
-        Client { client }
-    }
-
+#[async_trait]
+pub trait Contracts {
     /// Returns the Contract Application Binary Interface ( ABI ) of a verified smart contract.
     ///
     /// # Arguments
     ///
     /// * 'address' - A contract address that has verified source code
-    pub async fn get_abi(&self, address: &Address) -> Result<ABI> {
-        let parameters = &[(MODULE, CONTRACT), (ACTION, "getabi"), (ADDRESS, &TypeExtensions::format(address))];
-        let abi: String = self.client.get(parameters).await?;
-        ABI::load(abi.as_bytes()).map_err(|e| APIError::DeserializationError { message: e.to_string() })
-    }
+    async fn get_abi(&self, address: &Address) -> Result<ABI>;
 
     /// Returns the Solidity source code of a verified smart contract.
     ///
     /// # Arguments
     ///
     /// * 'address' - A contract address that has verified source code
-    pub async fn get_source_code(&self, address: &Address) -> Result<Vec<Contract>> {
+    async fn get_source_code(&self, address: &Address) -> Result<Vec<Contract>>;
+}
+
+#[async_trait]
+impl Contracts for Client {
+    async fn get_abi(&self, address: &Address) -> Result<ABI> {
+        let parameters = &[(MODULE, CONTRACT), (ACTION, "getabi"), (ADDRESS, &TypeExtensions::format(address))];
+        let abi: String = self.get(parameters).await?;
+        ABI::load(abi.as_bytes()).map_err(|e| APIError::DeserializationError { message: e.to_string() })
+    }
+
+    async fn get_source_code(&self, address: &Address) -> Result<Vec<Contract>> {
         let parameters = &[
             (MODULE, CONTRACT),
             (ACTION, "getsourcecode"),
             (ADDRESS, &TypeExtensions::format(address)),
         ];
-        self.client.get(parameters).await
+        self.get(parameters).await
     }
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Contract {
     pub source_code: String,

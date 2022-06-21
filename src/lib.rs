@@ -1,6 +1,6 @@
 use serde::de::Error as SerdeError;
-use serde::{de, de::DeserializeOwned, Deserialize, Deserializer, Serialize};
-use serde_with::DeserializeAs;
+use serde::{de, de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
+use serde_with::{DeserializeAs, SerializeAs};
 use std::error::Error;
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -29,7 +29,7 @@ pub type TransactionHash = ethabi::ethereum_types::H256;
 
 #[derive(Clone)]
 pub struct Client {
-    api_key: String,
+    pub api_key: String,
     client: reqwest::Client,
 }
 
@@ -128,6 +128,12 @@ impl<'de> DeserializeAs<'de, bool> for BoolFromStr {
     fn deserialize_as<D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<bool, D::Error> {
         let s = String::deserialize(deserializer).map_err(de::Error::custom)?;
         Ok(s == "1")
+    }
+}
+
+impl SerializeAs<bool> for BoolFromStr {
+    fn serialize_as<S: Serializer>(source: &bool, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+        serializer.serialize_str(if *source { "1" } else { "0" })
     }
 }
 
