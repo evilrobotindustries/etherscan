@@ -9,7 +9,8 @@ mod tests;
 
 const GAS_TRACKER: &str = "gastracker";
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait GasTracker {
     /// Returns the estimated time, in seconds, for a transaction to be confirmed on the blockchain
     ///
@@ -22,7 +23,8 @@ pub trait GasTracker {
     async fn oracle(&self) -> Result<Oracle>;
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl GasTracker for Client {
     /// Returns the estimated time, in seconds, for a transaction to be confirmed on the blockchain
     ///

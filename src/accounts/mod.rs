@@ -26,7 +26,8 @@ const SORT: &str = "sort";
 const START_BLOCK: &str = "startblock";
 const TRANSACTIONS: &str = "txlist";
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait Accounts {
     /// Returns the balance of a given address in wei.
     ///
@@ -163,7 +164,8 @@ pub trait Accounts {
     async fn blocks_mined(&self, address: &Address, block_type: BlockType, page: Page) -> Result<Vec<Block>>;
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Accounts for Client {
     async fn balance(&self, address: &Address, tag: Option<Tag>) -> Result<u128> {
         let parameters = &[

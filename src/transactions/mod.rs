@@ -10,7 +10,8 @@ mod tests;
 
 const TRANSACTION: &str = "transaction";
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait Transactions {
     /// Returns the status code of a contract execution
     ///
@@ -30,7 +31,8 @@ pub trait Transactions {
     async fn receipt_status(&self, hash: &TransactionHash) -> Result<bool>;
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Transactions for Client {
     async fn execution_status(&self, hash: &TransactionHash) -> Result<ExecutionStatus> {
         let parameters = &[

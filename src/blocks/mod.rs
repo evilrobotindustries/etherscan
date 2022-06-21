@@ -12,7 +12,8 @@ mod tests;
 
 const BLOCK: &str = "block";
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait Blocks {
     /// Returns the block number that was mined at a certain timestamp
     ///
@@ -37,7 +38,8 @@ pub trait Blocks {
     async fn reward(&self, block_number: &BlockNumber) -> Result<Block>;
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Blocks for Client {
     async fn at_time(&self, time: DateTime<Utc>, closest: Closest) -> Result<BlockNumber> {
         let parameters = &[

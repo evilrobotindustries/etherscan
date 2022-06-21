@@ -20,7 +20,8 @@ mod tests;
 
 const PROXY: &str = "proxy";
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait Proxy {
     /// Returns the number of most recent block
     async fn block_number(&self) -> Result<BlockNumber>;
@@ -129,7 +130,8 @@ pub trait Proxy {
     async fn uncle(&self, block_number: BlockNumber, index: u16) -> Result<Block>;
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Proxy for Client {
     async fn block_number(&self) -> Result<BlockNumber> {
         let parameters = &[(MODULE, PROXY), (ACTION, "eth_blockNumber")];

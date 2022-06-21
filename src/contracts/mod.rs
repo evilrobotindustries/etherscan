@@ -14,7 +14,8 @@ const CONTRACT: &str = "contract";
 
 pub type ABI = ethabi::Contract;
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait Contracts {
     /// Returns the Contract Application Binary Interface ( ABI ) of a verified smart contract.
     ///
@@ -31,7 +32,8 @@ pub trait Contracts {
     async fn get_source_code(&self, address: &Address) -> Result<Vec<Contract>>;
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Contracts for Client {
     async fn get_abi(&self, address: &Address) -> Result<ABI> {
         let parameters = &[(MODULE, CONTRACT), (ACTION, "getabi"), (ADDRESS, &TypeExtensions::format(address))];

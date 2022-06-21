@@ -12,7 +12,8 @@ mod tests;
 
 const STATS: &str = "stats";
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait Stats {
     /// Returns the size of the Ethereum blockchain, in bytes, over a date range
     ///
@@ -52,7 +53,8 @@ pub trait Stats {
     async fn total_supply_stats(&self) -> Result<TotalSupply>;
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl Stats for Client {
     async fn chain_size(
         &self,
