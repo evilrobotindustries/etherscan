@@ -13,6 +13,8 @@ mod tests;
 const CONTRACT: &str = "contract";
 
 pub type ABI = ethabi::Contract;
+pub type Function = ethabi::Function;
+pub type Token = ethabi::token::Token;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
